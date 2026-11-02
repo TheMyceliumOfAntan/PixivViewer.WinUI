@@ -14,12 +14,33 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Spacing="2">
-            <TextBlock Style="{StaticResource PageTitleTextBlockStyle}" Text="排行榜" />
-            <TextBlock
-                x:Name="Subtitle"
-                Style="{StaticResource PageSubtitleTextBlockStyle}"
-                Text="按人气排序的今日热门作品" />
+        <StackPanel Grid.Row="0" Spacing="8">
+            <StackPanel Spacing="2">
+                <TextBlock Style="{StaticResource PageTitleTextBlockStyle}" Text="排行榜" />
+                <TextBlock
+                    x:Name="Subtitle"
+                    Style="{StaticResource PageSubtitleTextBlockStyle}"
+                    Text="按人气排序的今日热门作品" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Click="OnFilterClick" ToolTipService.ToolTip="筛选（标签 / AI / R-18 / 黑名单）">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE71C;" />
+                        <TextBlock Text="筛选" />
+                    </StackPanel>
+                </Button>
+
+                <ComboBox
+                    x:Name="TargetBox"
+                    MinWidth="104"
+                    SelectionChanged="OnTargetChanged">
+                    <ComboBoxItem Content="全部" Tag="All" IsSelected="True" />
+                    <ComboBoxItem Content="插画" Tag="Illustrations" />
+                    <ComboBoxItem Content="漫画" Tag="Manga" />
+                    <ComboBoxItem Content="动图" Tag="Ugoira" />
+                </ComboBox>
+            </StackPanel>
         </StackPanel>
 
         <SelectorBar

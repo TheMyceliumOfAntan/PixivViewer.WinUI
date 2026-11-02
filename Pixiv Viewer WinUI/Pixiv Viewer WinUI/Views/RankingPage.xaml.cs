@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -81,7 +82,7 @@ public sealed partial class RankingPage : Page
         {
             var result = await AppServices.Pixiv.GetRankingAsync(_mode, _nextOffset, PageSize);
 
-            foreach (var item in result.Items)
+            foreach (var item in result.Items.Where(MatchesFilter))
             {
                 _items.Add(item);
             }
@@ -127,6 +128,80 @@ public sealed partial class RankingPage : Page
 
     private void OnItemInvoked(object? sender, Illustration item)
         => Frame.Navigate(typeof(IllustrationDetailPage), item);
+
+    // ---------------------------------------------------------------- 筛选 / 类别
+    // 排行榜接口不支持标签与类别参数，这里在客户端过滤（R-18 / R-18G 默认不过滤，
+    // 否则 R-18 榜单会被自己的筛选条件清空）。
+
+    private FilterOptions _filter = new() { ShowAi = true, ShowR18 = true, ShowR18G = true };
+    private SearchTarget _target = SearchTarget.All;
+
+    private static readonly char[] BlockedSeparators = { ',', '，', ' ', '\t', ';', '；' };
+
+    private async void OnFilterClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new FilterDialog(_filter, showCategory: false) { XamlRoot = XamlRoot };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary && dialog.Result is not null)
+        {
+            _filter = dialog.Result;
+            await LoadAsync(reset: true);
+        }
+    }
+
+    private async void OnTargetChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _target = ((TargetBox.SelectedItem as ComboBoxItem)?.Tag as string) switch
+        {
+            "Manga" => SearchTarget.Manga,
+            "Ugoira" => SearchTarget.Ugoira,
+            "Illustrations" => SearchTarget.Illustrations,
+            _ => SearchTarget.All,
+        };
+
+        if (_loaded && _items.Count > 0)
+        {
+            await LoadAsync(reset: true);
+        }
+    }
+
+    private bool MatchesFilter(Illustration item)
+    {
+        if (_target != SearchTarget.All && !_target.Matches(item.Type))
+        {
+            return false;
+        }
+
+        if (!_filter.ShowAi && item.IsAi)
+        {
+            return false;
+        }
+
+        if (!_filter.ShowR18 && item.XRestrict == 1)
+        {
+            return false;
+        }
+
+        if (!_filter.ShowR18G && item.XRestrict == 2)
+        {
+            return false;
+        }
+
+        var blocked = _filter.BlockedTags.Split(BlockedSeparators, StringSplitOptions.RemoveEmptyEntries);
+        if (blocked.Length > 0 &&
+            item.Tags.Any(t => blocked.Any(b => string.Equals(b, t.Name, StringComparison.OrdinalIgnoreCase))))
+        {
+            return false;
+        }
+
+        if (_filter.Tags.Count > 0 &&
+            !_filter.Tags.All(t => item.Tags.Any(x => string.Equals(x.Name, t, StringComparison.OrdinalIgnoreCase))))
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     private async void OnCardAction(object? sender, CardActionEventArgs e)
     {

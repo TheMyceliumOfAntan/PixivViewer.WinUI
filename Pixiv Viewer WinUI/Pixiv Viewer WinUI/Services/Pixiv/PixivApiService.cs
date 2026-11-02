@@ -104,8 +104,8 @@ public sealed class PixivApiService : IPixivService
             {
                 RankingMode.Weekly => "week",
                 RankingMode.Monthly => "month",
-                RankingMode.Rookie => "day_rookie",
-                RankingMode.Original => "day_original",
+                RankingMode.Rookie => "week_rookie",
+                RankingMode.Original => "week_original",
                 RankingMode.R18Daily => "day_r18",
                 RankingMode.R18GWeekly => "week_r18g",
                 RankingMode.DailyMale => "day_male",
