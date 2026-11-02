@@ -199,14 +199,30 @@ public sealed partial class IllustrationGrid : UserControl
         return columnWidth * 1.3 + 68;
     }
 
-    /// <summary>数据换了就强制重排一次，并把「内容不足一屏」的情况交给页面续加载。</summary>
+    /// <summary>数据换了就强制重排一次（并丢掉旧卡片），内容不足一屏时交给页面续加载。</summary>
     private void OnItemsSourceChanged()
     {
-        Repeater.InvalidateMeasure();
-
+        // 换筛选条件时页面会整体换掉 ItemsSource。ItemsRepeater 会按「索引」复用已实例化的卡片，
+        // 只调用 InvalidateMeasure 不会重新绑定数据，会出现「布局高度变了但图片没变」。
+        // 这里先置空再赋回，强制它销毁并重建所有元素。
         DispatcherQueue.TryEnqueue(() =>
         {
+            var source = ItemsSource;
+
+            // 关键：中间要强制跑一次布局，让 ItemsRepeater 真正把旧元素回收掉。
+            // 同一帧内 null → 新列表会被合并处理，元素不会重建（表现为「图片不变」）。
+            Repeater.ItemsSource = null;
+            Repeater.UpdateLayout();
+
+            Repeater.ItemsSource = source;
+
+            if (Repeater.Layout is MasonryLayout masonry)
+            {
+                masonry.ResetItems();
+            }
+
             Repeater.InvalidateMeasure();
+            Repeater.UpdateLayout();
             Scroller.UpdateLayout();
 
             if (Scroller.ScrollableHeight - Scroller.VerticalOffset <= 600)

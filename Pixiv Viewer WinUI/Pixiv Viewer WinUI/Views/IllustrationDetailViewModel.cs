@@ -30,9 +30,6 @@ public sealed class IllustrationDetailViewModel : ObservableObject
     private bool _isTranslatingDescription;
     private string _translatedDescription = string.Empty;
 
-    private static readonly SolidColorBrush BookmarkActiveBrush =
-        new(Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xC8, 0x3D));
-
     public Illustration? Item => _item;
 
     public bool HasItem => _item is not null;
@@ -213,8 +210,6 @@ public sealed class IllustrationDetailViewModel : ObservableObject
             if (SetProperty(ref _isBookmarked, value))
             {
                 OnPropertiesChanged(
-                    nameof(BookmarkGlyph),
-                    nameof(BookmarkIconBrush),
                     nameof(BookmarkActionText),
                     nameof(BookmarkMenuText));
             }
@@ -233,12 +228,6 @@ public sealed class IllustrationDetailViewModel : ObservableObject
             }
         }
     }
-
-    /// <summary>收藏图标：未收藏空心星，已收藏实心星。</summary>
-    public string BookmarkGlyph => IsBookmarked ? "\uE735" : "\uE734";
-
-    /// <summary>已收藏时图标变金色，未收藏时跟随主题前景色。</summary>
-    public Brush? BookmarkIconBrush => IsBookmarked ? BookmarkActiveBrush : null;
 
     /// <summary>主按钮文案。</summary>
     public string BookmarkActionText => IsBookmarked ? "已收藏" : "收藏";
@@ -560,7 +549,7 @@ public sealed class IllustrationDetailViewModel : ObservableObject
             nameof(CanExpandDescription), nameof(DescriptionMaxLines), nameof(DescriptionToggleText),
             nameof(IsDescriptionTranslated), nameof(DescriptionDisplayText),
             nameof(DescriptionTranslateButtonText), nameof(IsTranslatingDescription),
-            nameof(BookmarkGlyph), nameof(BookmarkIconBrush), nameof(BookmarkActionText),
+            nameof(BookmarkActionText),
             nameof(BookmarkMenuText),
             nameof(IsBookmarked), nameof(IsFollowed), nameof(IsLoading));
     }

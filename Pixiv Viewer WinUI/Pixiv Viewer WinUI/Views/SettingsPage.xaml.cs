@@ -11,10 +11,9 @@ namespace Pixiv_Viewer_WinUI.Views;
 
 public sealed partial class SettingsPage : Page
 {
-    // 改成你自己的仓库地址即可（默认先指向源项目）
-    private const string RepoUrl = "https://github.com/vmoranv/pixiv-proxy";
+    private const string RepoUrl = "https://github.com/TheMyceliumOfAntan/PixivViewer.WinUI";
 
-    private const string UpstreamRepoUrl = "https://github.com/vmoranv/pixiv-proxy";
+    private const string UpstreamRepoUrl = "https://github.com/TheMyceliumOfAntan/pixiv-proxy-api";
 
     private bool _initializing = true;
     private bool _loginInProgress;

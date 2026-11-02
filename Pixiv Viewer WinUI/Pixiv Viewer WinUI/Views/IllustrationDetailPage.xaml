@@ -117,10 +117,16 @@
                             </MenuFlyout>
                         </SplitButton.Flyout>
                         <StackPanel Orientation="Horizontal" Spacing="6">
+                            <!--  未收藏：空心星；已收藏：实心金色星（两个图标切换，避免 Foreground 为空导致图标不可见）  -->
                             <FontIcon
                                 FontSize="14"
-                                Foreground="{x:Bind View.BookmarkIconBrush, Mode=OneWay}"
-                                Glyph="{x:Bind View.BookmarkGlyph, Mode=OneWay}" />
+                                Glyph="&#xE734;"
+                                Visibility="{x:Bind View.IsBookmarked, Mode=OneWay, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <FontIcon
+                                FontSize="14"
+                                Foreground="#FFC83D"
+                                Glyph="&#xE735;"
+                                Visibility="{x:Bind View.IsBookmarked, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
                             <TextBlock Text="{x:Bind View.BookmarkActionText, Mode=OneWay}" />
                         </StackPanel>
                     </SplitButton>
@@ -637,11 +643,19 @@
                                     Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                     CornerRadius="6">
                                     <StackPanel Spacing="2">
-                                        <FontIcon
-                                            HorizontalAlignment="Center"
-                                            FontSize="14"
-                                            Foreground="{x:Bind View.BookmarkIconBrush, Mode=OneWay}"
-                                            Glyph="{x:Bind View.BookmarkGlyph, Mode=OneWay}" />
+                                        <Grid>
+                                            <FontIcon
+                                                HorizontalAlignment="Center"
+                                                FontSize="14"
+                                                Glyph="&#xE734;"
+                                                Visibility="{x:Bind View.IsBookmarked, Mode=OneWay, Converter={StaticResource InverseBoolToVisibility}}" />
+                                            <FontIcon
+                                                HorizontalAlignment="Center"
+                                                FontSize="14"
+                                                Foreground="#FFC83D"
+                                                Glyph="&#xE735;"
+                                                Visibility="{x:Bind View.IsBookmarked, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                        </Grid>
                                         <TextBlock
                                             HorizontalAlignment="Center"
                                             FontWeight="SemiBold"

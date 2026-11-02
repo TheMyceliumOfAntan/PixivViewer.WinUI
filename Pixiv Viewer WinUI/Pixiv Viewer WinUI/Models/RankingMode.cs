@@ -16,6 +16,15 @@ public enum RankingMode
 
     /// <summary>R-18G 本周榜（mode=week_r18g）。</summary>
     R18GWeekly,
+
+    /// <summary>男性向 今日榜（mode=day_male）。</summary>
+    DailyMale,
+
+    /// <summary>女性向 今日榜（mode=day_female）。</summary>
+    DailyFemale,
+
+    /// <summary>AI 作品 今日榜（mode=day_ai）。</summary>
+    DailyAi,
 }
 
 public enum SearchSort
@@ -61,6 +70,9 @@ public static class PixivEnumLabels
         RankingMode.Original => "原创",
         RankingMode.R18Daily => "R-18 今日",
         RankingMode.R18GWeekly => "R-18G 本周",
+        RankingMode.DailyMale => "男性向",
+        RankingMode.DailyFemale => "女性向",
+        RankingMode.DailyAi => "AI",
         _ => mode.ToString(),
     };
 

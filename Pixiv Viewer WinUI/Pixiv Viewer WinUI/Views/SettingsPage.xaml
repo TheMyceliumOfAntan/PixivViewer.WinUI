@@ -283,62 +283,88 @@
                 Text="关于" />
 
             <Border Style="{StaticResource SurfaceCardStyle}">
-                <StackPanel Spacing="10">
+                <StackPanel Spacing="12">
+                    <!--  软件信息：图标 + 名称 + 版本  -->
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Image
+                            Width="48"
+                            Height="48"
+                            Source="ms-appx:///Assets/app-48.png" />
+
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="2">
+                            <TextBlock
+                                FontSize="16"
+                                FontWeight="SemiBold"
+                                Text="Pixiv Viewer" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="第三方 Pixiv 客户端" />
+                        </StackPanel>
+
+                        <TextBlock
+                            x:Name="VersionText"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MetaTextBlockStyle}"
+                            Text="v1.0.3" />
+                    </Grid>
+
+                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock FontSize="14" Text="Pixiv Viewer" />
-                        <StackPanel
+                        <TextBlock FontSize="14" Text="更新日志" />
+                        <HyperlinkButton
                             Grid.Column="1"
+                            Padding="0"
                             VerticalAlignment="Center"
-                            Orientation="Horizontal"
-                            Spacing="12">
-                            <HyperlinkButton Click="OnChangelogClick" Content="更新日志" />
-                            <TextBlock
-                                x:Name="VersionText"
-                                VerticalAlignment="Center"
-                                Style="{StaticResource MetaTextBlockStyle}"
-                                Text="v1.0.1" />
-                        </StackPanel>
+                            Click="OnChangelogClick"
+                            Content="查看" />
                     </Grid>
-                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock FontSize="14" Text="项目仓库" />
+                        <HyperlinkButton
+                            Grid.Column="1"
+                            Padding="0"
+                            VerticalAlignment="Center"
+                            Click="OnOpenRepoClick"
+                            Content="TheMyceliumOfAntan/PixivViewer.WinUI" />
+                    </Grid>
+
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock FontSize="14" Text="Pixiv API" />
-                        <TextBlock
-                            x:Name="ApiStatus"
+                        <HyperlinkButton
                             Grid.Column="1"
-                            Style="{StaticResource MetaTextBlockStyle}"
-                            Text="已接入 · 自建反代" />
-                    </Grid>
-                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="反代服务" />
-                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="基于 vmoranv/pixiv-proxy 修改优化 · 自建部署" />
-                        </StackPanel>
-                        <StackPanel
-                            Grid.Column="1"
+                            Padding="0"
                             VerticalAlignment="Center"
-                            Orientation="Horizontal"
-                            Spacing="2">
-                            <HyperlinkButton Click="OnOpenRepoClick" Content="仓库" />
-                            <HyperlinkButton Click="OnOpenProxyRepoClick" Content="源项目" />
-                        </StackPanel>
+                            Click="OnOpenProxyRepoClick"
+                            Content="TheMyceliumOfAntan/pixiv-proxy-api" />
                     </Grid>
+
                     <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+
                     <TextBlock
                         Style="{StaticResource MetaTextBlockStyle}"
-                        Text="WinUI 3 · Windows App SDK · Fluent Design / Mica" />
+                        Text="WinUI 3 · Windows App SDK · GPL-3.0" />
                 </StackPanel>
             </Border>
 

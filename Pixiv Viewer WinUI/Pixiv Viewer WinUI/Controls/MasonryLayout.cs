@@ -81,7 +81,19 @@ public sealed class MasonryLayout : VirtualizingLayout
     {
         // 数据变了（追加/替换/清空），索引对应的内容可能完全不同，所有缓存作废
         ResetMetrics();
+        _visible.Clear();
+        _relayoutRequested = false;
+
         base.OnItemsChangedCore(context, source, args);
+        InvalidateMeasure();
+    }
+
+    /// <summary>数据被整体换掉（换了筛选条件）时调用：丢掉缓存，强制按新数据重建。</summary>
+    public void ResetItems()
+    {
+        _visible.Clear();
+        ResetMetrics();
+        _relayoutRequested = false;
         InvalidateMeasure();
     }
 

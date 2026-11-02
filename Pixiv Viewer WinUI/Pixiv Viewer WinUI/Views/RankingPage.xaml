@@ -34,6 +34,9 @@
             <SelectorBarItem Tag="Monthly" Text="本月" />
             <SelectorBarItem Tag="Rookie" Text="新人" />
             <SelectorBarItem Tag="Original" Text="原创" />
+            <SelectorBarItem Tag="DailyMale" Text="男性向" />
+            <SelectorBarItem Tag="DailyFemale" Text="女性向" />
+            <SelectorBarItem Tag="DailyAi" Text="AI" />
             <SelectorBarItem
                 x:Name="R18Item"
                 Tag="R18Daily"

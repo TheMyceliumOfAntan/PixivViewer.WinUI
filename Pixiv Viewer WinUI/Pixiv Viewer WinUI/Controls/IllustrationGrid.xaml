@@ -21,8 +21,7 @@
 
             <ItemsRepeater
                 x:Name="Repeater"
-                HorizontalAlignment="Left"
-                ItemsSource="{x:Bind ItemsSource, Mode=OneWay}">
+                HorizontalAlignment="Left">
                 <ItemsRepeater.Layout>
                     <controls:MasonryLayout
                         MaxColumns="6"
