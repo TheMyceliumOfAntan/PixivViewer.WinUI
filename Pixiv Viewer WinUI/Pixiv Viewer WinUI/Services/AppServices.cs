@@ -1,3 +1,4 @@
+using System;
 using Microsoft.UI.Xaml;
 using Pixiv_Viewer_WinUI.Helpers;
 using Pixiv_Viewer_WinUI.Services.Pixiv;
@@ -9,15 +10,28 @@ namespace Pixiv_Viewer_WinUI.Services;
 /// </summary>
 public static class AppServices
 {
-    public static PixivApiService PixivApi { get; } = new();
+    public static AppSettings Settings { get; } = new AppSettings();
+
+    public static PixivApiService PixivApi { get; private set; } = null!;
 
     public static IPixivService Pixiv => PixivApi;
 
     public static IDownloadService Downloads { get; } = new DownloadService();
 
-    public static AppSettings Settings { get; } = new AppSettings();
-
     static AppServices()
+    {
+        PixivApi = new PixivApiService(Settings.ApiBaseUrl);
+        ApplyApiSettings();
+    }
+
+    /// <summary>设置里改了 API 地址后重建服务（会重新读取本机保存的登录态）。</summary>
+    public static void ReloadApi()
+    {
+        PixivApi = new PixivApiService(Settings.ApiBaseUrl);
+        ApplyApiSettings();
+    }
+
+    private static void ApplyApiSettings()
     {
         PixivApi.ShowR18 = Settings.ShowR18;
         PixivApi.ShowR18G = Settings.ShowR18G;
@@ -36,6 +50,44 @@ public sealed class AppSettings : ObservableObject
     private int _downloadConcurrency = 3;
     private string _blockedTags = string.Empty;
     private ElementTheme _theme = ElementTheme.Default;
+    private string _apiBaseUrl = SettingsStore.LoadApiBaseUrl();
+
+    /// <summary>
+    /// Pixiv API 服务地址（用户自建）。软件不内置任何公共接口，
+    /// 未填写时所有请求都会提示去「设置 → 服务地址」配置。
+    /// </summary>
+    public string ApiBaseUrl
+    {
+        get => _apiBaseUrl;
+        set
+        {
+            var normalized = NormalizeBaseUrl(value);
+
+            if (SetProperty(ref _apiBaseUrl, normalized))
+            {
+                SettingsStore.SaveApiBaseUrl(normalized);
+            }
+        }
+    }
+
+    /// <summary>规范化地址：去空格、去尾部斜杠，缺协议时补 https://。</summary>
+    public static string NormalizeBaseUrl(string? value)
+    {
+        var url = (value ?? string.Empty).Trim().TrimEnd('/');
+
+        if (url.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            url = "https://" + url;
+        }
+
+        return url;
+    }
 
     /// <summary>接口失败时是否用示例数据兜底（仅用于离线预览/设计稿核对）。</summary>
     public bool UseSampleData

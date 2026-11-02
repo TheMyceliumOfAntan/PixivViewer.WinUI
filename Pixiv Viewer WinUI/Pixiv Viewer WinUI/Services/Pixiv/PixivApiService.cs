@@ -20,7 +20,7 @@ namespace Pixiv_Viewer_WinUI.Services.Pixiv;
 /// </summary>
 public sealed class PixivApiService : IPixivService
 {
-    public const string DefaultBaseUrl = "https://pixiv.junsi233.top";
+    public const string DefaultBaseUrl = "";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -835,8 +835,18 @@ public sealed class PixivApiService : IPixivService
             ? value.GetString() ?? string.Empty
             : string.Empty;
 
+    private void EnsureConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(_session.BaseUrl))
+        {
+            throw new PixivNotConfiguredException();
+        }
+    }
+
     private async Task<HttpResponseMessage> SendWebAsync(string url, CancellationToken cancellationToken)
     {
+        EnsureConfigured();
+
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("User-Agent", PixivSession.UserAgent);
 
@@ -1044,6 +1054,8 @@ public sealed class PixivApiService : IPixivService
     {
         for (var attempt = 0; ; attempt++)
         {
+            EnsureConfigured();
+
             var token = await _session.GetAccessTokenAsync(cancellationToken);
 
             using var request = new HttpRequestMessage(method, url);

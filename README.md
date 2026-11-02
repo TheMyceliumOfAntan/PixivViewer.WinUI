@@ -77,8 +77,18 @@
 
 从 [Releases](https://github.com/TheMyceliumOfAntan/PixivViewer.WinUI/releases) 下载 `PixivViewer-Setup-<版本>-x64.exe`，双击安装。
 
+> **⚠️ 使用前需要自备接口**
+> 本软件不内置任何公共 API 服务，首次启动会让你填写自己的服务地址。
+> 服务端代码与一键部署入口在 [TheMyceliumOfAntan/pixiv-proxy-api](https://github.com/TheMyceliumOfAntan/pixiv-proxy-api)。
+
+首次启动流程：
+
+1. 打开程序会自动进入「设置 → 服务地址」
+2. 填入你自己的 API 地址（例如 `https://your-api.example.com`），点「保存」
+3. 到「设置 → 账号」登录，之后就能正常使用了
+
 - 已装旧版本时**直接装新版即可覆盖升级**，不需要先卸载
-- 登录状态、设置、下载记录保存在 `%LOCALAPPDATA%\PixivViewer`，升级和卸载都不会丢
+- 服务地址、登录状态、设置、下载记录保存在 `%LOCALAPPDATA%\PixivViewer`，升级和卸载都不会丢
 - 卸载时会单独询问是否一并删除这些本地数据
 
 也提供免安装版压缩包：解压后双击 `Pixiv Viewer WinUI.exe` 即可运行，不需要 MSIX、不需要签名。
@@ -94,6 +104,9 @@
 ---
 
 ## 常见问题
+
+**打开后一直提示「还没有配置 Pixiv API 地址」？**
+到「设置 → 服务地址」填写你自建服务的地址并保存。服务端：https://github.com/TheMyceliumOfAntan/pixiv-proxy-api
 
 **提示「未登录或登录已过期」？**
 到「设置 → 账号」重新网页登录一次即可，登录状态平时会自动续期。

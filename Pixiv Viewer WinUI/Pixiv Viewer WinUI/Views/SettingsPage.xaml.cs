@@ -28,6 +28,7 @@ public sealed partial class SettingsPage : Page
         R18GSwitch.IsOn = AppServices.Settings.ShowR18G;
         AiSwitch.IsOn = AppServices.Settings.ShowAi;
         BlockedTagsBox.Text = AppServices.Settings.BlockedTags;
+        ApiBaseUrlBox.Text = AppServices.Settings.ApiBaseUrl;
         DownloadFolderBox.Text = AppServices.Settings.DownloadFolder;
         ConcurrencyBox.Value = AppServices.Settings.DownloadConcurrency;
         VersionText.Text = $"v{typeof(App).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
@@ -217,6 +218,21 @@ public sealed partial class SettingsPage : Page
 
     private async void OnOpenRepoClick(object sender, RoutedEventArgs e)
         => await OpenUrlAsync(RepoUrl);
+
+    /// <summary>保存 API 服务地址并立即生效。</summary>
+    private void OnSaveApiBaseUrlClick(object sender, RoutedEventArgs e)
+    {
+        var url = AppSettings.NormalizeBaseUrl(ApiBaseUrlBox.Text);
+        ApiBaseUrlBox.Text = url;
+
+        AppServices.Settings.ApiBaseUrl = url;
+        AppServices.ReloadApi();
+        UpdateAccountUi();
+
+        ShowHint(url.Length == 0
+            ? "服务地址为空，填写后才能真正加载内容"
+            : "已保存，正在使用该地址");
+    }
 
     /// <summary>「关于 → 更新日志」：弹出对话框显示各版本更新内容。</summary>
     private async void OnChangelogClick(object sender, RoutedEventArgs e)

@@ -20,6 +20,43 @@
                 <TextBlock Style="{StaticResource PageSubtitleTextBlockStyle}" Text="外观、数据与账号" />
             </StackPanel>
 
+            <!--  API 服务地址（必须由用户自行配置）  -->
+            <TextBlock
+                Margin="0,8,0,0"
+                Style="{StaticResource SectionHeaderTextBlockStyle}"
+                Text="服务地址" />
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <StackPanel Spacing="10">
+                    <StackPanel Spacing="2">
+                        <TextBlock FontSize="14" Text="Pixiv API 地址" />
+                        <TextBlock
+                            Style="{StaticResource MetaTextBlockStyle}"
+                            Text="本软件不提供公共接口，请填写你自建服务的地址。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            x:Name="ApiBaseUrlBox"
+                            PlaceholderText="https://your-server.example.com" />
+                        <Button
+                            Grid.Column="1"
+                            Click="OnSaveApiBaseUrlClick"
+                            Content="保存" />
+                    </Grid>
+
+                    <HyperlinkButton
+                        Padding="0"
+                        Click="OnOpenProxyRepoClick"
+                        Content="查看 Pixiv API 项目（含一键部署）" />
+                </StackPanel>
+            </Border>
+
             <!--  外观  -->
             <TextBlock
                 Margin="0,8,0,0"
