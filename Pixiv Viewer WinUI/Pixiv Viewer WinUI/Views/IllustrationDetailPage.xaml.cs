@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -13,9 +14,12 @@ using Microsoft.UI.Xaml.Navigation;
 using Pixiv_Viewer_WinUI.Controls;
 using Pixiv_Viewer_WinUI.Helpers;
 using Pixiv_Viewer_WinUI.Models;
+using Microsoft.UI.Text;
 using Pixiv_Viewer_WinUI.Services;
+using Pixiv_Viewer_WinUI.Services.Pixiv;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
+using Windows.Storage.Streams;
 using Windows.System;
 
 namespace Pixiv_Viewer_WinUI.Views;
@@ -791,22 +795,367 @@ public sealed partial class IllustrationDetailPage : Page
 
     private async void OnSendCommentClick(object sender, RoutedEventArgs e)
     {
-        var text = CommentBox.Text.Trim();
+        var text = BuildCommentText().Trim();
         if (text.Length == 0)
         {
             ShowHint("评论内容不能为空");
             return;
         }
 
-        var ok = await View.AddCommentAsync(text);
-        if (ok)
+        if (text.Length > MaxCommentLength)
         {
-            CommentBox.Text = string.Empty;
-            ShowHint("评论已发布");
+            ShowHint($"评论最多 {MaxCommentLength} 个字符");
+            return;
         }
-        else
+
+        SendButton.IsEnabled = false;
+        EmojiButton.IsEnabled = false;
+        SendButton.Content = "发送中…";
+
+        try
         {
-            ShowHint("评论功能待接入 Pixiv API");
+            var ok = await View.AddCommentAsync(text);
+            if (ok)
+            {
+                ResetCommentInput();
+                ShowHint("评论已发布");
+            }
+            else
+            {
+                ShowHint("评论发送失败：请检查登录状态、网页 Cookie 或网络");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowHint($"评论发送失败：{ex.Message}");
+        }
+        finally
+        {
+            SendButton.Content = "发送";
+            EmojiButton.IsEnabled = true;
+            UpdateCommentState();
+        }
+    }
+
+    // ---------------------------------------------------------------- 评论编辑器
+
+    /// <summary>pixiv 评论长度上限。</summary>
+    private const int MaxCommentLength = 140;
+
+    /// <summary>RichEditBox 里图片在文本中的占位符。</summary>
+    private const char ImagePlaceholder = '\uFFFC';
+
+    /// <summary>slug 标记的起止符（零宽，编辑时不可见）。</summary>
+    private const char MarkerBoundary = '\u2060';
+
+    private const char MarkerBitZero = '\u200B';
+    private const char MarkerBitOne = '\u200C';
+    private const int MarkerBits = 10;
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> EmojiBytes = new();
+    private static Flyout? _emojiFlyout;
+
+    private void OnCommentTextChanged(object sender, RoutedEventArgs e) => UpdateCommentState();
+
+    private void UpdateCommentState()
+    {
+        var text = BuildCommentText();
+        CommentCounter.Text = $"{text.Length} / {MaxCommentLength}";
+        SendButton.IsEnabled = text.Trim().Length is > 0 and <= MaxCommentLength;
+    }
+
+    private void ResetCommentInput()
+    {
+        CommentBox.Document.SetText(TextSetOptions.None, string.Empty);
+        UpdateCommentState();
+    }
+
+    /// <summary>
+    /// 把 RichEditBox 的内容转成 pixiv 能识别的文本：图片 → <c>(slug)</c>，
+    /// 零宽标记只用于定位图片对应的表情，不会出现在结果里。
+    /// </summary>
+    private string BuildCommentText()
+    {
+        CommentBox.Document.GetText(TextGetOptions.None, out var raw);
+
+        var builder = new System.Text.StringBuilder(raw.Length);
+        var pendingId = 0;
+
+        for (var i = 0; i < raw.Length; i++)
+        {
+            var c = raw[i];
+
+            if (c == MarkerBoundary)
+            {
+                if (TryReadMarker(raw, i, out var markerId, out var markerLength))
+                {
+                    pendingId = markerId;
+                    i += markerLength - 1;
+                }
+                else
+                {
+                    i = SkipMarker(raw, i);
+                }
+
+                continue;
+            }
+
+            if (c == ImagePlaceholder)
+            {
+                if (pendingId != 0)
+                {
+                    var slug = PixivEmoji.SlugForId(pendingId);
+                    if (slug is not null)
+                    {
+                        builder.Append('(').Append(slug).Append(')');
+                    }
+
+                    pendingId = 0;
+                }
+
+                continue;
+            }
+
+            // 标记后面不是图片 → 孤立标记，丢弃
+            pendingId = 0;
+            builder.Append(c == '\r' ? '\n' : c);
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private static string EncodeMarker(int id)
+    {
+        var builder = new System.Text.StringBuilder(MarkerBits + 2);
+        builder.Append(MarkerBoundary);
+
+        for (var bit = MarkerBits - 1; bit >= 0; bit--)
+        {
+            builder.Append(((id >> bit) & 1) == 1 ? MarkerBitOne : MarkerBitZero);
+        }
+
+        builder.Append(MarkerBoundary);
+        return builder.ToString();
+    }
+
+    private static bool TryReadMarker(string raw, int start, out int id, out int length)
+    {
+        id = 0;
+        length = 0;
+
+        if (start >= raw.Length || raw[start] != MarkerBoundary)
+        {
+            return false;
+        }
+
+        if (start + MarkerBits + 1 >= raw.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < MarkerBits; i++)
+        {
+            var c = raw[start + 1 + i];
+            if (c != MarkerBitZero && c != MarkerBitOne)
+            {
+                return false;
+            }
+
+            id = (id << 1) | (c == MarkerBitOne ? 1 : 0);
+        }
+
+        if (raw[start + 1 + MarkerBits] != MarkerBoundary)
+        {
+            return false;
+        }
+
+        length = MarkerBits + 2;
+        return true;
+    }
+
+    /// <summary>跳过一段孤立标记（图片被删掉但标记残留）。</summary>
+    private static int SkipMarker(string raw, int start)
+    {
+        var end = raw.IndexOf(MarkerBoundary, start + 1);
+        return end < 0 ? start : end;
+    }
+
+    /// <summary>把光标移到刚插入的表情块之后。</summary>
+    private int SkipEmojiBlock(int position)
+    {
+        CommentBox.Document.GetText(TextGetOptions.None, out var raw);
+
+        var index = Math.Clamp(position, 0, raw.Length);
+        while (index < raw.Length &&
+               raw[index] is ImagePlaceholder or MarkerBoundary or MarkerBitZero or MarkerBitOne)
+        {
+            index++;
+        }
+
+        return index;
+    }
+
+    private void OnEmojiClick(object sender, RoutedEventArgs e)
+    {
+        _emojiFlyout ??= BuildEmojiFlyout();
+        _emojiFlyout.ShowAt(EmojiButton);
+    }
+
+    private Flyout BuildEmojiFlyout()
+    {
+        var panel = new StackPanel { Spacing = 4, Padding = new Thickness(4) };
+        var emojis = PixivEmoji.All;
+
+        for (var i = 0; i < emojis.Count; i += 6)
+        {
+            var row = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 2,
+            };
+
+            foreach (var (slug, url) in emojis.Skip(i).Take(6))
+            {
+                row.Children.Add(CreateEmojiButton(slug, url));
+            }
+
+            panel.Children.Add(row);
+        }
+
+        return new Flyout
+        {
+            Content = panel,
+            Placement = FlyoutPlacementMode.Top,
+        };
+    }
+
+    private Button CreateEmojiButton(string slug, string url)
+    {
+        var image = new Image
+        {
+            Width = 24,
+            Height = 24,
+            Stretch = Stretch.Uniform,
+        };
+
+        _ = LoadEmojiThumbAsync(url, image);
+
+        var button = new Button
+        {
+            Width = 36,
+            Height = 36,
+            Padding = new Thickness(0),
+            Content = image,
+            Tag = slug,
+        };
+
+        ToolTipService.SetToolTip(button, $":{slug}:");
+
+        button.Click += (s, _) =>
+        {
+            if (s is Button { Tag: string clicked })
+            {
+                InsertEmoji(clicked);
+            }
+        };
+
+        return button;
+    }
+
+    private static async Task LoadEmojiThumbAsync(string url, Image image)
+    {
+        try
+        {
+            var bitmap = await ImageCache.GetAsync(AppServices.MapStaticUrl(url), 48);
+            if (bitmap is not null)
+            {
+                image.Source = bitmap;
+            }
+        }
+        catch (Exception)
+        {
+            // 缩略图失败不影响插入
+        }
+    }
+
+    private async void InsertEmoji(string slug)
+    {
+        var id = PixivEmoji.IdForSlug(slug);
+        if (id == 0)
+        {
+            return;
+        }
+
+        var bytes = await GetEmojiBytesAsync(slug);
+        if (bytes is null)
+        {
+            ShowHint("表情加载失败，请检查网络");
+            return;
+        }
+
+        try
+        {
+            var selection = CommentBox.Document.Selection;
+            var start = selection.StartPosition;
+            var end = selection.EndPosition;
+
+            // 先放零宽标记，再把图片插到标记后面（RichEdit 的实际存储顺序）
+            var markerRange = CommentBox.Document.GetRange(start, end);
+            markerRange.SetText(TextSetOptions.None, EncodeMarker(id));
+            markerRange.Collapse(false);
+
+            var imageRange = CommentBox.Document.GetRange(markerRange.EndPosition, markerRange.EndPosition);
+
+            using (var stream = new InMemoryRandomAccessStream())
+            {
+                using (var writer = new DataWriter(stream))
+                {
+                    writer.WriteBytes(bytes);
+                    await writer.StoreAsync();
+                    await writer.FlushAsync();
+                    writer.DetachStream();
+                }
+
+                stream.Seek(0);
+                imageRange.InsertImage(20, 20, 0, VerticalCharacterAlignment.Baseline, slug, stream);
+            }
+
+            // 从原光标位置往后跳过「标记 + 图片」块，保证下一次输入/插表情接在后面
+            var caret = SkipEmojiBlock(start);
+            CommentBox.Document.Selection.SetRange(caret, caret);
+
+            CommentBox.Focus(FocusState.Programmatic);
+            UpdateCommentState();
+        }
+        catch (Exception ex)
+        {
+            PixivDiagnostics.Write($"insert emoji failed: {ex.Message}");
+            ShowHint("插入表情失败");
+        }
+    }
+
+    private static async Task<byte[]?> GetEmojiBytesAsync(string slug)
+    {
+        if (EmojiBytes.TryGetValue(slug, out var cached))
+        {
+            return cached;
+        }
+
+        var url = PixivEmoji.UrlForSlug(slug);
+        if (url is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var bytes = await AppServices.Images.GetByteArrayAsync(AppServices.MapStaticUrl(url));
+            EmojiBytes[slug] = bytes;
+            return bytes;
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 

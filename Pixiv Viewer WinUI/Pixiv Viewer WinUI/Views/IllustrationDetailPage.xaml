@@ -831,24 +831,50 @@
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                         BorderThickness="0,1,0,0"
                         Visibility="{x:Bind View.ShowCommentInput, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                        <Grid ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                            <TextBox
-                                x:Name="CommentBox"
-                                MaxLength="140"
-                                PlaceholderText="写下你的评论…"
-                                Text="{x:Bind View.NewCommentText, Mode=TwoWay}" />
+                                <RichEditBox
+                                    x:Name="CommentBox"
+                                    MinHeight="36"
+                                    MaxHeight="88"
+                                    Padding="8,6"
+                                    VerticalAlignment="Center"
+                                    DisabledFormattingAccelerators="All"
+                                    IsSpellCheckEnabled="False"
+                                    ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                    TextChanged="OnCommentTextChanged"
+                                    TextWrapping="Wrap" />
 
-                            <Button
-                                Grid.Column="1"
-                                Click="OnSendCommentClick"
-                                Content="发送"
-                                Style="{StaticResource AccentButtonStyle}" />
-                        </Grid>
+                                <Button
+                                    x:Name="EmojiButton"
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Click="OnEmojiClick"
+                                    ToolTipService.ToolTip="插入表情">
+                                    <FontIcon FontSize="16" Glyph="&#xE76E;" />
+                                </Button>
+
+                                <Button
+                                    x:Name="SendButton"
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Click="OnSendCommentClick"
+                                    Content="发送"
+                                    Style="{StaticResource AccentButtonStyle}" />
+                            </Grid>
+
+                            <TextBlock
+                                x:Name="CommentCounter"
+                                HorizontalAlignment="Right"
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="0 / 140" />
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>

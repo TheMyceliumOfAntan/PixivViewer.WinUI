@@ -25,6 +25,20 @@ public static class AppServices
 
     public static PixivEndpoints Endpoints => PixivApi.Endpoints;
 
+    /// <summary>把 pixiv 静态资源域名（s.pximg.net）换成当前接口方式的地址。</summary>
+    public static string MapStaticUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return url;
+        }
+
+        return url.Replace(
+            "https://s.pximg.net",
+            PixivApi.Endpoints.StaticBase.TrimEnd('/'),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     static AppServices()
     {
         ReloadApi();

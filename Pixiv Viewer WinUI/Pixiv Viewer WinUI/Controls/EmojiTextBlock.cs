@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
-using Microsoft.UI.Xaml.Media.Imaging;
 using Pixiv_Viewer_WinUI.Helpers;
+using Pixiv_Viewer_WinUI.Services;
 
 namespace Pixiv_Viewer_WinUI.Controls;
 
@@ -19,9 +19,6 @@ public sealed class EmojiTextBlock : UserControl
         typeof(string),
         typeof(EmojiTextBlock),
         new PropertyMetadata(string.Empty, OnTextChanged));
-
-    /// <summary>贴纸图片缓存：同一张图在几十条评论里复用同一个 BitmapImage。</summary>
-    private static readonly Dictionary<string, BitmapImage> ImageCache = new(StringComparer.Ordinal);
 
     private readonly RichTextBlock _host = new()
     {
@@ -69,19 +66,37 @@ public sealed class EmojiTextBlock : UserControl
 
     private static Image CreateSticker(string url)
     {
-        if (!ImageCache.TryGetValue(url, out var bitmap))
+        var image = new Image
         {
-            bitmap = new BitmapImage(new Uri(url)) { DecodePixelWidth = 48 };
-            ImageCache[url] = bitmap;
-        }
-
-        return new Image
-        {
-            Source = bitmap,
             Width = 20,
             Height = 20,
             Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
             VerticalAlignment = VerticalAlignment.Center,
         };
+
+        _ = LoadStickerAsync(url, image);
+        return image;
+    }
+
+    /// <summary>
+    /// 贴纸统一走 <see cref="ImageCache"/>：它会用当前接口方式的 HttpClient
+    /// （域前置时自动连固定 IP + 补 Referer），直接 new BitmapImage(url) 会被 SNI 拦掉。
+    /// </summary>
+    private static async Task LoadStickerAsync(string url, Image image)
+    {
+        try
+        {
+            var mapped = AppServices.MapStaticUrl(url);
+            var bitmap = await ImageCache.GetAsync(mapped, 48);
+
+            if (bitmap is not null)
+            {
+                image.Source = bitmap;
+            }
+        }
+        catch (Exception)
+        {
+            // 单张图失败就留空，不影响其它内容
+        }
     }
 }
