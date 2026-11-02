@@ -116,6 +116,28 @@
             <TextBox
                 x:Name="BlockedBox"
                 PlaceholderText="逗号或空格分隔，例如：グロ, AI生成" />
+
+            <!--  黑名单标签候选：选中后追加到上面的输入框  -->
+            <AutoSuggestBox
+                x:Name="BlockedTagInput"
+                Margin="0,4,0,0"
+                PlaceholderText="也可以在这里输入中文/英文补全后添加"
+                QueryIcon="Add"
+                QuerySubmitted="OnBlockedTagQuerySubmitted"
+                TextChanged="OnBlockedTagTextChanged">
+                <AutoSuggestBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:TagSuggestion">
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="{x:Bind Tag}" />
+                            <TextBlock
+                                FontSize="11"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind TranslationText}"
+                                Visibility="{x:Bind HasTranslationText, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </AutoSuggestBox.ItemTemplate>
+            </AutoSuggestBox>
         </StackPanel>
     </StackPanel>
 </ContentDialog>

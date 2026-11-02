@@ -150,6 +150,76 @@ public sealed partial class FilterDialog : ContentDialog
 
     private void OnAddTagClick(object sender, RoutedEventArgs e) => AddCurrentTag();
 
+    private CancellationTokenSource? _blockedSuggestCts;
+
+    /// <summary>黑名单：选中候选 / 回车后追加到黑名单输入框。</summary>
+    private void OnBlockedTagQuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+    {
+        var tag = ((args.ChosenSuggestion as TagSuggestion)?.Tag ?? args.QueryText ?? string.Empty).Trim();
+
+        sender.Text = string.Empty;
+        sender.ItemsSource = null;
+
+        if (tag.Length == 0)
+        {
+            return;
+        }
+
+        var separators = new[] { ',', '，', ' ', '\t', ';', '；' };
+        var parts = BlockedBox.Text
+            .Split(separators, StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+
+        if (parts.Any(p => string.Equals(p, tag, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        parts.Add(tag);
+        BlockedBox.Text = string.Join(", ", parts);
+    }
+
+    /// <summary>黑名单输入框的标签候选（和上面、搜索页同一套接口）。</summary>
+    private async void OnBlockedTagTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+    {
+        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
+        {
+            return;
+        }
+
+        var text = sender.Text.Trim();
+
+        _blockedSuggestCts?.Cancel();
+        _blockedSuggestCts?.Dispose();
+        _blockedSuggestCts = null;
+
+        if (text.Length == 0)
+        {
+            sender.ItemsSource = null;
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _blockedSuggestCts = cts;
+
+        try
+        {
+            await Task.Delay(300, cts.Token);
+            var items = await AppServices.Pixiv.SuggestTagsAsync(text, cts.Token);
+
+            if (!cts.IsCancellationRequested)
+            {
+                sender.ItemsSource = items;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception)
+        {
+        }
+    }
+
     private void AddCurrentTag()
     {
         var tag = TagInput.Text.Trim();
