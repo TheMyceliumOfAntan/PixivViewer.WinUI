@@ -21,9 +21,20 @@ public sealed partial class SettingsPage : Page
     private bool _initializing = true;
     private bool _loginInProgress;
 
+    /// <summary>悬浮提示的自动关闭计时器。</summary>
+    private readonly DispatcherTimer _hintTimer = new() { Interval = TimeSpan.FromSeconds(4) };
+
     public SettingsPage()
     {
         InitializeComponent();
+
+        _hintTimer.Tick += (_, _) =>
+        {
+            _hintTimer.Stop();
+            Hint.IsOpen = false;
+        };
+
+        Hint.Closed += (_, _) => _hintTimer.Stop();
 
         ThemeBox.SelectedIndex = (int)AppServices.Settings.Theme;
         SampleSwitch.IsOn = AppServices.Settings.UseSampleData;
@@ -239,7 +250,17 @@ public sealed partial class SettingsPage : Page
             return;
         }
 
-        ShowHint(ModeRadio.SelectedIndex == 1
+        var mode = ModeRadio.SelectedIndex == 1
+            ? PixivConnectionMode.DomainFronting
+            : PixivConnectionMode.ReverseProxy;
+
+        // 初始化后 RadioButtons 还会补发一次 SelectionChanged，和当前设置一致时不要误提示
+        if (mode == AppServices.Settings.ApiMode)
+        {
+            return;
+        }
+
+        ShowHint(mode == PixivConnectionMode.DomainFronting
             ? "已选择域前置直连，点「保存接口设置」后生效"
             : "已选择自建 API 反代，点「保存接口设置」后生效");
     }
@@ -446,5 +467,12 @@ public sealed partial class SettingsPage : Page
         Hint.Message = message;
         Hint.Severity = severity;
         Hint.IsOpen = true;
+
+        // 错误多留一会儿，其余 4 秒自动消失
+        _hintTimer.Stop();
+        _hintTimer.Interval = severity == InfoBarSeverity.Error
+            ? TimeSpan.FromSeconds(6)
+            : TimeSpan.FromSeconds(4);
+        _hintTimer.Start();
     }
 }

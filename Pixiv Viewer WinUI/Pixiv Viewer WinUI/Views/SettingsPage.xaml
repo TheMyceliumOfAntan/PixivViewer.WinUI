@@ -5,523 +5,588 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="Transparent">
 
-    <ScrollViewer
-        Padding="28,16,24,24"
-        HorizontalScrollBarVisibility="Disabled"
-        HorizontalScrollMode="Disabled"
-        VerticalScrollBarVisibility="Auto">
-        <StackPanel
-            MaxWidth="880"
-            HorizontalAlignment="Left"
-            Spacing="14">
-
-            <StackPanel Spacing="2">
-                <TextBlock Style="{StaticResource PageTitleTextBlockStyle}" Text="设置" />
-                <TextBlock Style="{StaticResource PageSubtitleTextBlockStyle}" Text="外观、数据与账号" />
-            </StackPanel>
-
-            <!--  接口方式与地址  -->
-            <TextBlock
-                Margin="0,8,0,0"
-                Style="{StaticResource SectionHeaderTextBlockStyle}"
-                Text="服务地址" />
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <StackPanel Spacing="12">
-                    <RadioButtons
-                        x:Name="ModeRadio"
-                        SelectionChanged="OnApiModeChanged">
-                        <RadioButton Content="自建 API 反代（推荐）" Tag="proxy" />
-                        <RadioButton Content="域前置直连（无需自建服务器）" Tag="fronting" />
-                    </RadioButtons>
-
-                    <!--  自建反代  -->
-                    <StackPanel x:Name="ProxyPanel" Spacing="8">
-                        <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="Pixiv API 地址" />
-                            <TextBlock
-                                Style="{StaticResource MetaTextBlockStyle}"
-                                Text="本软件不提供公共接口，请填写你自建服务的地址。"
-                                TextWrapping="Wrap" />
+    <Grid>
+        <ScrollViewer
+            Padding="28,16,24,24"
+            HorizontalScrollBarVisibility="Disabled"
+            HorizontalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel
+                MaxWidth="880"
+                HorizontalAlignment="Left"
+                Spacing="14">
+    
+                <StackPanel Spacing="2">
+                    <TextBlock Style="{StaticResource PageTitleTextBlockStyle}" Text="设置" />
+                    <TextBlock Style="{StaticResource PageSubtitleTextBlockStyle}" Text="外观、数据与账号" />
+                </StackPanel>
+    
+                <!--  接口方式与地址  -->
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                    Text="服务地址" />
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <StackPanel Spacing="12">
+                        <RadioButtons
+                            x:Name="ModeRadio"
+                            SelectionChanged="OnApiModeChanged">
+                            <RadioButton Content="自建 API 反代（推荐）" Tag="proxy" />
+                            <RadioButton Content="域前置直连（无需自建服务器）" Tag="fronting" />
+                        </RadioButtons>
+    
+                        <!--  自建反代  -->
+                        <StackPanel x:Name="ProxyPanel" Spacing="8">
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="Pixiv API 地址" />
+                                <TextBlock
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="本软件不提供公共接口，请填写你自建服务的地址。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+    
+                            <TextBox
+                                x:Name="ApiBaseUrlBox"
+                                PlaceholderText="https://your-server.example.com" />
+    
+                            <HyperlinkButton
+                                Padding="0"
+                                Click="OnOpenProxyRepoClick"
+                                Content="查看 Pixiv API 项目（含一键部署）" />
                         </StackPanel>
-
-                        <TextBox
-                            x:Name="ApiBaseUrlBox"
-                            PlaceholderText="https://your-server.example.com" />
-
-                        <HyperlinkButton
-                            Padding="0"
-                            Click="OnOpenProxyRepoClick"
-                            Content="查看 Pixiv API 项目（含一键部署）" />
+    
+                        <!--  域前置直连  -->
+                        <StackPanel x:Name="FrontingPanel" Spacing="8">
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="服务器 IP 映射" />
+                                <TextBlock
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="每行「域名 = IP, IP」。只改 DNS 解析，TLS 仍按原域名握手；留空则使用内置默认值。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+    
+                            <TextBox
+                                x:Name="HostMapBox"
+                                Height="170"
+                                AcceptsReturn="True"
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                TextWrapping="NoWrap"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.VerticalScrollBarVisibility="Auto" />
+    
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Button Click="OnResetHostMapClick" Content="恢复默认 IP" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="网络环境不同，可自行替换为可用 IP" />
+                            </StackPanel>
+                        </StackPanel>
+    
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="反代失败时自动切换域前置" />
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="连不上 / 超时 / 5xx 时自动兜底，并在本次运行内保持（仅自建反代模式生效）" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch
+                                x:Name="FallbackSwitch"
+                                Grid.Column="1"
+                                MinWidth="0"
+                                VerticalAlignment="Center"
+                                OffContent=""
+                                OnContent=""
+                                Toggled="OnFallbackToggled" />
+                        </Grid>
+    
+                        <Button
+                            Click="OnSaveApiSettingsClick"
+                            Content="保存接口设置"
+                            Style="{StaticResource AccentButtonStyle}" />
                     </StackPanel>
-
-                    <!--  域前置直连  -->
-                    <StackPanel x:Name="FrontingPanel" Spacing="8">
+                </Border>
+    
+                <!--  外观  -->
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                    Text="外观" />
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
                         <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="服务器 IP 映射" />
-                            <TextBlock
-                                Style="{StaticResource MetaTextBlockStyle}"
-                                Text="每行「域名 = IP, IP」。只改 DNS 解析，TLS 仍按原域名握手；留空则使用内置默认值。"
-                                TextWrapping="Wrap" />
+                            <TextBlock FontSize="14" Text="应用主题" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="跟随系统，或手动指定浅色 / 深色" />
                         </StackPanel>
-
-                        <TextBox
-                            x:Name="HostMapBox"
-                            Height="170"
-                            AcceptsReturn="True"
-                            FontFamily="Consolas"
-                            FontSize="12"
-                            TextWrapping="NoWrap"
-                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
-
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Button Click="OnResetHostMapClick" Content="恢复默认 IP" />
+                        <ComboBox
+                            x:Name="ThemeBox"
+                            Grid.Column="1"
+                            MinWidth="140"
+                            VerticalAlignment="Center"
+                            SelectionChanged="OnThemeChanged">
+                            <ComboBoxItem Content="跟随系统" Tag="0" />
+                            <ComboBoxItem Content="浅色" Tag="1" />
+                            <ComboBoxItem Content="深色" Tag="2" />
+                        </ComboBox>
+                    </Grid>
+                </Border>
+    
+                <!--  数据  -->
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                    Text="数据" />
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="使用示例数据" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="接口失败时用假数据兜底，方便离线核对排版" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="SampleSwitch"
+                            Grid.Column="1"
+                            MinWidth="0"
+                            VerticalAlignment="Center"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="OnSampleDataToggled" />
+                    </Grid>
+                </Border>
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="显示 AI 生成作品" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 Pixiv 标记为 AI 生成的作品" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="AiSwitch"
+                            Grid.Column="1"
+                            MinWidth="0"
+                            VerticalAlignment="Center"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="OnAiToggled" />
+                    </Grid>
+                </Border>
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="显示 R-18 作品" />
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 R-18（卡片仍会标注等级）" />
+                            </StackPanel>
+                            <ToggleSwitch
+                                x:Name="R18Switch"
+                                Grid.Column="1"
+                                MinWidth="0"
+                                VerticalAlignment="Center"
+                                OffContent=""
+                                OnContent=""
+                                Toggled="OnR18Toggled" />
+                        </Grid>
+    
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="显示 R-18G 作品" />
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 R-18G" />
+                            </StackPanel>
+                            <ToggleSwitch
+                                x:Name="R18GSwitch"
+                                Grid.Column="1"
+                                MinWidth="0"
+                                VerticalAlignment="Center"
+                                OffContent=""
+                                OnContent=""
+                                Toggled="OnR18GToggled" />
+                        </Grid>
+    
+                        <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+    
+                        <StackPanel Spacing="6">
+                            <TextBlock FontSize="14" Text="黑名单标签" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="逗号或空格分隔，命中的作品不会出现在任何列表里" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="BlockedTagsBox" PlaceholderText="例如：R-18, グロ, AI生成" />
+                                <Button
+                                    Grid.Column="1"
+                                    Click="OnSaveBlockedTagsClick"
+                                    Content="保存" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="本地缓存" />
+                            <TextBlock x:Name="CacheSizeText" Style="{StaticResource MetaTextBlockStyle}" Text="缩略图与作品信息缓存" />
+                        </StackPanel>
+                        <Button
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Click="OnClearCacheClick"
+                            Content="清空" />
+                    </Grid>
+                </Border>
+    
+                <!--  下载  -->
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                    Text="下载" />
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="6">
+                            <TextBlock FontSize="14" Text="保存目录" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    x:Name="DownloadFolderBox"
+                                    PlaceholderText="默认：图片\Pixiv"
+                                    TextChanged="OnDownloadFolderChanged" />
+                                <Button
+                                    Grid.Column="1"
+                                    Click="OnPickFolderClick"
+                                    Content="浏览…" />
+                            </Grid>
+                        </StackPanel>
+    
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="并发下载数" />
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="同时下载的图片数量（1~8），过高容易触发反代限流" />
+                            </StackPanel>
+                            <NumberBox
+                                x:Name="ConcurrencyBox"
+                                Grid.Column="1"
+                                Width="132"
+                                VerticalAlignment="Center"
+                                Maximum="8"
+                                Minimum="1"
+                                SpinButtonPlacementMode="Compact"
+                                ValueChanged="OnConcurrencyChanged" />
+                        </Grid>
+    
+                        <Button Click="OnOpenDownloadFolderClick" Content="打开下载文件夹" />
+                    </StackPanel>
+                </Border>
+    
+                <!--  账号  -->
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                    Text="账号" />
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="AccountTitle" FontSize="14" Text="未登录" />
+                                <TextBlock
+                                    x:Name="AccountDescription"
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="粘贴 Pixiv refresh_token 后登录；token 只保存在本机，不会写进源码" />
+                            </StackPanel>
+                            <Button
+                                x:Name="SignOutButton"
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Click="OnSignOutClick"
+                                Content="退出登录"
+                                Visibility="Collapsed" />
+                        </Grid>
+    
+                        <Grid x:Name="TokenRow" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <PasswordBox
+                                x:Name="TokenBox"
+                                PlaceholderText="refresh_token"
+                                PasswordRevealMode="Peek" />
+                            <Button
+                                x:Name="SignInButton"
+                                Grid.Column="1"
+                                Click="OnSignInClick"
+                                Content="登录"
+                                Style="{StaticResource AccentButtonStyle}" />
+                            <Button
+                                x:Name="WebLoginButton"
+                                Grid.Column="2"
+                                Click="OnWebLoginClick"
+                                Content="网页登录"
+                                ToolTipService.ToolTip="打开 Pixiv 网页登录，自动获取 refresh_token 和 cookie（收藏集需要）" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+    
+                <!--  关于  -->
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                    Text="关于" />
+    
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <StackPanel Spacing="0">
+                        <!--  软件信息：图标 + 名称 + 版本  -->
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+    
+                            <Image
+                                Width="48"
+                                Height="48"
+                                Source="ms-appx:///Assets/app-48.png" />
+    
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="3">
+                                <TextBlock
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Text="Pixiv Viewer" />
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="第三方 Pixiv 客户端" />
+                            </StackPanel>
+    
                             <TextBlock
+                                x:Name="VersionText"
+                                Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Style="{StaticResource MetaTextBlockStyle}"
-                                Text="网络环境不同，可自行替换为可用 IP" />
-                        </StackPanel>
-                    </StackPanel>
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="反代失败时自动切换域前置" />
-                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="连不上 / 超时 / 5xx 时自动兜底，并在本次运行内保持（仅自建反代模式生效）" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ToggleSwitch
-                            x:Name="FallbackSwitch"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            OffContent=""
-                            OnContent=""
-                            Toggled="OnFallbackToggled" />
-                    </Grid>
-
-                    <Button
-                        Click="OnSaveApiSettingsClick"
-                        Content="保存接口设置"
-                        Style="{StaticResource AccentButtonStyle}" />
-                </StackPanel>
-            </Border>
-
-            <!--  外观  -->
-            <TextBlock
-                Margin="0,8,0,0"
-                Style="{StaticResource SectionHeaderTextBlockStyle}"
-                Text="外观" />
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <Grid ColumnSpacing="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="2">
-                        <TextBlock FontSize="14" Text="应用主题" />
-                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="跟随系统，或手动指定浅色 / 深色" />
-                    </StackPanel>
-                    <ComboBox
-                        x:Name="ThemeBox"
-                        Grid.Column="1"
-                        MinWidth="140"
-                        VerticalAlignment="Center"
-                        SelectionChanged="OnThemeChanged">
-                        <ComboBoxItem Content="跟随系统" Tag="0" />
-                        <ComboBoxItem Content="浅色" Tag="1" />
-                        <ComboBoxItem Content="深色" Tag="2" />
-                    </ComboBox>
-                </Grid>
-            </Border>
-
-            <!--  数据  -->
-            <TextBlock
-                Margin="0,8,0,0"
-                Style="{StaticResource SectionHeaderTextBlockStyle}"
-                Text="数据" />
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <Grid ColumnSpacing="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="2">
-                        <TextBlock FontSize="14" Text="使用示例数据" />
-                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="接口失败时用假数据兜底，方便离线核对排版" />
-                    </StackPanel>
-                    <ToggleSwitch
-                        x:Name="SampleSwitch"
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        OffContent=""
-                        OnContent=""
-                        Toggled="OnSampleDataToggled" />
-                </Grid>
-            </Border>
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <Grid ColumnSpacing="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="2">
-                        <TextBlock FontSize="14" Text="显示 AI 生成作品" />
-                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 Pixiv 标记为 AI 生成的作品" />
-                    </StackPanel>
-                    <ToggleSwitch
-                        x:Name="AiSwitch"
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        OffContent=""
-                        OnContent=""
-                        Toggled="OnAiToggled" />
-                </Grid>
-            </Border>
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <StackPanel Spacing="10">
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="显示 R-18 作品" />
-                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 R-18（卡片仍会标注等级）" />
-                        </StackPanel>
-                        <ToggleSwitch
-                            x:Name="R18Switch"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            OffContent=""
-                            OnContent=""
-                            Toggled="OnR18Toggled" />
-                    </Grid>
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="显示 R-18G 作品" />
-                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 R-18G" />
-                        </StackPanel>
-                        <ToggleSwitch
-                            x:Name="R18GSwitch"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            OffContent=""
-                            OnContent=""
-                            Toggled="OnR18GToggled" />
-                    </Grid>
-
-                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
-
-                    <StackPanel Spacing="6">
-                        <TextBlock FontSize="14" Text="黑名单标签" />
-                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="逗号或空格分隔，命中的作品不会出现在任何列表里" />
-                        <Grid ColumnSpacing="8">
+                                Text="v1.1.1" />
+                        </Grid>
+    
+                        <Rectangle
+                            Margin="0,16,0,8"
+                            Style="{StaticResource DividerRectangleStyle}" />
+    
+                        <!--  更新  -->
+                        <Grid
+                            MinHeight="44"
+                            Margin="0,2"
+                            ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="BlockedTagsBox" PlaceholderText="例如：R-18, グロ, AI生成" />
-                            <Button
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontSize="14"
+                                Text="更新日志" />
+                            <HyperlinkButton
                                 Grid.Column="1"
-                                Click="OnSaveBlockedTagsClick"
-                                Content="保存" />
+                                Padding="8,4"
+                                VerticalAlignment="Center"
+                                Click="OnChangelogClick"
+                                Content="查看" />
                         </Grid>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <Grid ColumnSpacing="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="2">
-                        <TextBlock FontSize="14" Text="本地缓存" />
-                        <TextBlock x:Name="CacheSizeText" Style="{StaticResource MetaTextBlockStyle}" Text="缩略图与作品信息缓存" />
-                    </StackPanel>
-                    <Button
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Click="OnClearCacheClick"
-                        Content="清空" />
-                </Grid>
-            </Border>
-
-            <!--  下载  -->
-            <TextBlock
-                Margin="0,8,0,0"
-                Style="{StaticResource SectionHeaderTextBlockStyle}"
-                Text="下载" />
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <StackPanel Spacing="12">
-                    <StackPanel Spacing="6">
-                        <TextBlock FontSize="14" Text="保存目录" />
-                        <Grid ColumnSpacing="8">
+    
+                        <Grid
+                            MinHeight="44"
+                            Margin="0,2"
+                            ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox
-                                x:Name="DownloadFolderBox"
-                                PlaceholderText="默认：图片\Pixiv"
-                                TextChanged="OnDownloadFolderChanged" />
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock FontSize="14" Text="检查更新" />
+                                <TextBlock
+                                    x:Name="UpdateStatusText"
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="启动时每天检查一次"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button
+                                x:Name="CheckUpdateButton"
+                                Grid.Column="1"
+                                MinWidth="88"
+                                VerticalAlignment="Center"
+                                Click="OnCheckUpdateClick"
+                                Content="检查" />
+                        </Grid>
+    
+                        <Grid
+                            MinHeight="44"
+                            Margin="0,2"
+                            ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock FontSize="14" Text="启动时自动检查更新" />
+                                <TextBlock
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="每天最多检查一次；有新版本时弹窗提示"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch
+                                x:Name="UpdateSwitch"
+                                Grid.Column="1"
+                                MinWidth="0"
+                                Padding="0"
+                                VerticalAlignment="Center"
+                                OffContent=""
+                                OnContent=""
+                                Toggled="OnAutoCheckUpdateToggled" />
+                        </Grid>
+    
+                        <Rectangle
+                            Margin="0,12,0,8"
+                            Style="{StaticResource DividerRectangleStyle}" />
+    
+                        <!--  链接  -->
+                        <Grid
+                            MinHeight="44"
+                            Margin="0,2"
+                            ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock FontSize="14" Text="项目仓库" />
+                                <TextBlock
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="TheMyceliumOfAntan/PixivViewer.WinUI"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
                             <Button
                                 Grid.Column="1"
-                                Click="OnPickFolderClick"
-                                Content="浏览…" />
+                                MinWidth="88"
+                                VerticalAlignment="Center"
+                                Click="OnOpenRepoClick"
+                                Content="仓库" />
                         </Grid>
-                    </StackPanel>
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="并发下载数" />
-                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="同时下载的图片数量（1~8），过高容易触发反代限流" />
-                        </StackPanel>
-                        <NumberBox
-                            x:Name="ConcurrencyBox"
-                            Grid.Column="1"
-                            Width="132"
-                            VerticalAlignment="Center"
-                            Maximum="8"
-                            Minimum="1"
-                            SpinButtonPlacementMode="Compact"
-                            ValueChanged="OnConcurrencyChanged" />
-                    </Grid>
-
-                    <Button Click="OnOpenDownloadFolderClick" Content="打开下载文件夹" />
-                </StackPanel>
-            </Border>
-
-            <!--  账号  -->
-            <TextBlock
-                Margin="0,8,0,0"
-                Style="{StaticResource SectionHeaderTextBlockStyle}"
-                Text="账号" />
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <StackPanel Spacing="12">
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock x:Name="AccountTitle" FontSize="14" Text="未登录" />
-                            <TextBlock
-                                x:Name="AccountDescription"
-                                Style="{StaticResource MetaTextBlockStyle}"
-                                Text="粘贴 Pixiv refresh_token 后登录；token 只保存在本机，不会写进源码" />
-                        </StackPanel>
-                        <Button
-                            x:Name="SignOutButton"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Click="OnSignOutClick"
-                            Content="退出登录"
-                            Visibility="Collapsed" />
-                    </Grid>
-
-                    <Grid x:Name="TokenRow" ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <PasswordBox
-                            x:Name="TokenBox"
-                            PlaceholderText="refresh_token"
-                            PasswordRevealMode="Peek" />
-                        <Button
-                            x:Name="SignInButton"
-                            Grid.Column="1"
-                            Click="OnSignInClick"
-                            Content="登录"
-                            Style="{StaticResource AccentButtonStyle}" />
-                        <Button
-                            x:Name="WebLoginButton"
-                            Grid.Column="2"
-                            Click="OnWebLoginClick"
-                            Content="网页登录"
-                            ToolTipService.ToolTip="打开 Pixiv 网页登录，自动获取 refresh_token 和 cookie（收藏集需要）" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!--  关于  -->
-            <TextBlock
-                Margin="0,8,0,0"
-                Style="{StaticResource SectionHeaderTextBlockStyle}"
-                Text="关于" />
-
-            <Border Style="{StaticResource SurfaceCardStyle}">
-                <StackPanel Spacing="12">
-                    <!--  软件信息：图标 + 名称 + 版本  -->
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <Image
-                            Width="48"
-                            Height="48"
-                            Source="ms-appx:///Assets/app-48.png" />
-
-                        <StackPanel
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Spacing="2">
-                            <TextBlock
-                                FontSize="16"
-                                FontWeight="SemiBold"
-                                Text="Pixiv Viewer" />
-                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="第三方 Pixiv 客户端" />
-                        </StackPanel>
-
+    
+                        <Grid
+                            MinHeight="44"
+                            Margin="0,2"
+                            ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock FontSize="14" Text="API 服务端" />
+                                <TextBlock
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="TheMyceliumOfAntan/pixiv-proxy-api"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="1"
+                                MinWidth="88"
+                                VerticalAlignment="Center"
+                                Click="OnOpenProxyRepoClick"
+                                Content="服务端" />
+                        </Grid>
+    
+                        <Grid
+                            MinHeight="44"
+                            Margin="0,2"
+                            ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock FontSize="14" Text="参考项目" />
+                                <TextBlock
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="Pixeval（域前置默认 IP 与实现思路）"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="1"
+                                MinWidth="88"
+                                VerticalAlignment="Center"
+                                Click="OnOpenPixevalClick"
+                                Content="Pixeval" />
+                        </Grid>
+    
                         <TextBlock
-                            x:Name="VersionText"
-                            Grid.Column="2"
-                            VerticalAlignment="Center"
+                            Margin="0,10,0,0"
                             Style="{StaticResource MetaTextBlockStyle}"
-                            Text="v1.1.1" />
-                    </Grid>
-
-                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock FontSize="14" Text="更新日志" />
-                        <HyperlinkButton
-                            Grid.Column="1"
-                            Padding="0"
-                            VerticalAlignment="Center"
-                            Click="OnChangelogClick"
-                            Content="查看" />
-                    </Grid>
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="检查更新" />
-                            <TextBlock
-                                x:Name="UpdateStatusText"
-                                Style="{StaticResource MetaTextBlockStyle}"
-                                Text="启动时每天检查一次"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <Button
-                            x:Name="CheckUpdateButton"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Click="OnCheckUpdateClick"
-                            Content="检查" />
-                    </Grid>
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock FontSize="14" Text="启动时自动检查更新" />
-                            <TextBlock
-                                Style="{StaticResource MetaTextBlockStyle}"
-                                Text="每天最多检查一次；有新版本时弹窗提示"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ToggleSwitch
-                            x:Name="UpdateSwitch"
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            OffContent=""
-                            OnContent=""
-                            Toggled="OnAutoCheckUpdateToggled" />
-                    </Grid>
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock FontSize="14" Text="项目仓库" />
-                        <HyperlinkButton
-                            Grid.Column="1"
-                            Padding="0"
-                            VerticalAlignment="Center"
-                            Click="OnOpenRepoClick"
-                            Content="TheMyceliumOfAntan/PixivViewer.WinUI" />
-                    </Grid>
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock FontSize="14" Text="Pixiv API" />
-                        <HyperlinkButton
-                            Grid.Column="1"
-                            Padding="0"
-                            VerticalAlignment="Center"
-                            Click="OnOpenProxyRepoClick"
-                            Content="TheMyceliumOfAntan/pixiv-proxy-api" />
-                    </Grid>
-
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock FontSize="14" Text="致谢 · 域前置方案参考" />
-                        <HyperlinkButton
-                            Grid.Column="1"
-                            Padding="0"
-                            VerticalAlignment="Center"
-                            Click="OnOpenPixevalClick"
-                            Content="Pixeval/Pixeval" />
-                    </Grid>
-
-                    <TextBlock
-                        Style="{StaticResource MetaTextBlockStyle}"
-                        Text="域前置直连的默认服务器 IP 与实现思路参考自开源项目 Pixeval（GPL-3.0），在此致谢。"
-                        TextWrapping="Wrap" />
-
-                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
-
-                    <TextBlock
-                        Style="{StaticResource MetaTextBlockStyle}"
-                        Text="WinUI 3 · Windows App SDK · GPL-3.0" />
-                </StackPanel>
-            </Border>
-
-            <InfoBar
-                x:Name="Hint"
-                IsOpen="False"
-                Severity="Informational" />
-        </StackPanel>
-    </ScrollViewer>
+                            Text="域前置直连的默认服务器 IP 与实现思路参考自开源项目 Pixeval（GPL-3.0），在此致谢。"
+                            TextWrapping="Wrap" />
+    
+                        <Rectangle
+                            Margin="0,14,0,10"
+                            Style="{StaticResource DividerRectangleStyle}" />
+    
+                        <TextBlock
+                            Style="{StaticResource MetaTextBlockStyle}"
+                            Text="WinUI 3 · Windows App SDK · GPL-3.0" />
+                    </StackPanel>
+                </Border>
+    
+            </StackPanel>
+        </ScrollViewer>
+        <InfoBar
+            x:Name="Hint"
+            Margin="0,0,24,24"
+            MaxWidth="520"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            IsClosable="True"
+            IsOpen="False"
+            Severity="Informational" />
+    </Grid>
 </Page>
