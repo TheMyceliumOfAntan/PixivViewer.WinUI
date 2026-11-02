@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="Pixiv_Viewer_WinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Pixiv_Viewer_WinUI"
+    xmlns:converters="using:Pixiv_Viewer_WinUI.Converters">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary Source="ms-appx:///Styles/AppStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!--  值转换器  -->
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+            <converters:InverseBoolConverter x:Key="InverseBool" />
+            <converters:PositiveIntToVisibilityConverter x:Key="PositiveIntToVisibility" />
+            <converters:StringToVisibilityConverter x:Key="StringToVisibility" />
+            <converters:IdToBrushConverter x:Key="IdToBrush" />
+            <converters:UrlToImageSourceConverter x:Key="UrlToImage" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Pixiv_Viewer_WinUI</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x86;x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <Nullable>enable</Nullable>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Version>1.0.3</Version>
+    <AssemblyVersion>1.0.3.0</AssemblyVersion>
+    <FileVersion>1.0.3.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+    <Content Include="Assets\app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
+  </ItemGroup>
+
+  <!-- Publish Properties -->
+  <PropertyGroup>
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
+    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <!-- WinUI 3 涓嶆敮鎸佽鍓細XAML 渚濊禆鍙嶅皠锛岃鍓悗鍚姩鍗冲穿锛岃繖閲屽繀椤讳繚鎸?False -->
+    <PublishTrimmed>False</PublishTrimmed>
+  </PropertyGroup>
+
+  <!--
+    闈炴墦鍖咃紙鍏?MSIX锛夊彂甯冿細dotnet publish -p:PublishProfile=Unpackaged
+    鍏抽敭涓夐」锛?
+      WindowsPackageType=None        鐢熸垚鏃犲寘鏍囪瘑鐨勫簲鐢紙鍚﹀垯鍚姩鎶モ€滈渶瑕佸簲鐢ㄥ寘鏍囪瘑鈥濓級
+      WindowsAppSDKSelfContained=true 鑷甫 Windows App SDK 杩愯鏃讹紝鐢ㄦ埛鏃犻渶瀹夎
+      SelfContained=true             鑷甫 .NET 杩愯鏃?
+  -->
+  <PropertyGroup Condition="'$(WindowsPackageType)' == 'None'">
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+
+  <!--
+    闈炴墦鍖呭彂甯冩椂锛宒otnet publish 涓嶄細鎶婃瀯寤洪樁娈电敓鎴愮殑 <椤圭洰鍚?.pri 澶嶅埗鍒板彂甯冪洰褰曪紝
+    缂哄皯瀹冧細鍚姩鍗冲穿锛圡icrosoft.UI.Xaml.dll / 0xc000027b锛夈€傝繖閲岃ˉ涓€娆℃嫹璐濄€?
+  -->
+  <Target Name="CopyPriFileToPublish" AfterTargets="Publish" Condition="'$(WindowsPackageType)' == 'None'">
+    <ItemGroup>
+      <_UnpackagedPriFile Include="$(OutDir)*.pri" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_UnpackagedPriFile)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_UnpackagedPriFile)' != ''" />
+  </Target>
+</Project>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Pixiv_Viewer_WinUI.Views.RankingPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Pixiv_Viewer_WinUI.Controls"
+    NavigationCacheMode="Required"
+    Background="Transparent">
+
+    <Grid Padding="28,16,24,0" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Spacing="2">
+            <TextBlock Style="{StaticResource PageTitleTextBlockStyle}" Text="排行榜" />
+            <TextBlock
+                x:Name="Subtitle"
+                Style="{StaticResource PageSubtitleTextBlockStyle}"
+                Text="按人气排序的今日热门作品" />
+        </StackPanel>
+
+        <SelectorBar
+            x:Name="ModeSelector"
+            Grid.Row="1"
+            SelectionChanged="OnModeChanged">
+            <SelectorBarItem
+                IsSelected="True"
+                Tag="Daily"
+                Text="今日" />
+            <SelectorBarItem Tag="Weekly" Text="本周" />
+            <SelectorBarItem Tag="Monthly" Text="本月" />
+            <SelectorBarItem Tag="Rookie" Text="新人" />
+            <SelectorBarItem Tag="Original" Text="原创" />
+            <SelectorBarItem
+                x:Name="R18Item"
+                Tag="R18Daily"
+                Text="R-18"
+                Visibility="Collapsed" />
+            <SelectorBarItem
+                x:Name="R18GItem"
+                Tag="R18GWeekly"
+                Text="R-18G"
+                Visibility="Collapsed" />
+        </SelectorBar>
+
+        <Grid Grid.Row="2">
+            <controls:IllustrationGrid
+                x:Name="Illustrations"
+                CardActionRequested="OnCardAction"
+                ItemInvoked="OnItemInvoked"
+                LoadMoreRequested="OnLoadMoreRequested" />
+
+            <StackPanel
+                x:Name="EmptyState"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="10"
+                Visibility="Collapsed">
+                <FontIcon
+                    FontSize="36"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    Glyph="&#xE9D9;" />
+                <TextBlock Style="{StaticResource EmptyStateTitleStyle}" Text="暂无排行数据" />
+                <TextBlock
+                    Style="{StaticResource EmptyStateMessageStyle}"
+                    Text="接入 Pixiv API 后，这里会显示对应榜单的作品。" />
+            </StackPanel>
+
+            <ProgressRing
+                x:Name="LoadingRing"
+                Width="36"
+                Height="36"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center" />
+        </Grid>
+    </Grid>
+</Page>

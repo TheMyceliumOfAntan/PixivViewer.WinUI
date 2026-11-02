@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Pixiv_Viewer_WinUI.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <ScrollViewer
+        Padding="28,16,24,24"
+        HorizontalScrollBarVisibility="Disabled"
+        HorizontalScrollMode="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <StackPanel
+            MaxWidth="880"
+            HorizontalAlignment="Left"
+            Spacing="14">
+
+            <StackPanel Spacing="2">
+                <TextBlock Style="{StaticResource PageTitleTextBlockStyle}" Text="设置" />
+                <TextBlock Style="{StaticResource PageSubtitleTextBlockStyle}" Text="外观、数据与账号" />
+            </StackPanel>
+
+            <!--  外观  -->
+            <TextBlock
+                Margin="0,8,0,0"
+                Style="{StaticResource SectionHeaderTextBlockStyle}"
+                Text="外观" />
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock FontSize="14" Text="应用主题" />
+                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="跟随系统，或手动指定浅色 / 深色" />
+                    </StackPanel>
+                    <ComboBox
+                        x:Name="ThemeBox"
+                        Grid.Column="1"
+                        MinWidth="140"
+                        VerticalAlignment="Center"
+                        SelectionChanged="OnThemeChanged">
+                        <ComboBoxItem Content="跟随系统" Tag="0" />
+                        <ComboBoxItem Content="浅色" Tag="1" />
+                        <ComboBoxItem Content="深色" Tag="2" />
+                    </ComboBox>
+                </Grid>
+            </Border>
+
+            <!--  数据  -->
+            <TextBlock
+                Margin="0,8,0,0"
+                Style="{StaticResource SectionHeaderTextBlockStyle}"
+                Text="数据" />
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock FontSize="14" Text="使用示例数据" />
+                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="接口失败时用假数据兜底，方便离线核对排版" />
+                    </StackPanel>
+                    <ToggleSwitch
+                        x:Name="SampleSwitch"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        OffContent=""
+                        OnContent=""
+                        Toggled="OnSampleDataToggled" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock FontSize="14" Text="显示 AI 生成作品" />
+                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 Pixiv 标记为 AI 生成的作品" />
+                    </StackPanel>
+                    <ToggleSwitch
+                        x:Name="AiSwitch"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        OffContent=""
+                        OnContent=""
+                        Toggled="OnAiToggled" />
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="显示 R-18 作品" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 R-18（卡片仍会标注等级）" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="R18Switch"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="OnR18Toggled" />
+                    </Grid>
+
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="显示 R-18G 作品" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关闭时列表里隐藏 R-18G" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="R18GSwitch"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="OnR18GToggled" />
+                    </Grid>
+
+                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock FontSize="14" Text="黑名单标签" />
+                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="逗号或空格分隔，命中的作品不会出现在任何列表里" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="BlockedTagsBox" PlaceholderText="例如：R-18, グロ, AI生成" />
+                            <Button
+                                Grid.Column="1"
+                                Click="OnSaveBlockedTagsClick"
+                                Content="保存" />
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock FontSize="14" Text="本地缓存" />
+                        <TextBlock x:Name="CacheSizeText" Style="{StaticResource MetaTextBlockStyle}" Text="缩略图与作品信息缓存" />
+                    </StackPanel>
+                    <Button
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Click="OnClearCacheClick"
+                        Content="清空" />
+                </Grid>
+            </Border>
+
+            <!--  下载  -->
+            <TextBlock
+                Margin="0,8,0,0"
+                Style="{StaticResource SectionHeaderTextBlockStyle}"
+                Text="下载" />
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel Spacing="6">
+                        <TextBlock FontSize="14" Text="保存目录" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox
+                                x:Name="DownloadFolderBox"
+                                PlaceholderText="默认：图片\Pixiv"
+                                TextChanged="OnDownloadFolderChanged" />
+                            <Button
+                                Grid.Column="1"
+                                Click="OnPickFolderClick"
+                                Content="浏览…" />
+                        </Grid>
+                    </StackPanel>
+
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="并发下载数" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="同时下载的图片数量（1~8），过高容易触发反代限流" />
+                        </StackPanel>
+                        <NumberBox
+                            x:Name="ConcurrencyBox"
+                            Grid.Column="1"
+                            Width="132"
+                            VerticalAlignment="Center"
+                            Maximum="8"
+                            Minimum="1"
+                            SpinButtonPlacementMode="Compact"
+                            ValueChanged="OnConcurrencyChanged" />
+                    </Grid>
+
+                    <Button Click="OnOpenDownloadFolderClick" Content="打开下载文件夹" />
+                </StackPanel>
+            </Border>
+
+            <!--  账号  -->
+            <TextBlock
+                Margin="0,8,0,0"
+                Style="{StaticResource SectionHeaderTextBlockStyle}"
+                Text="账号" />
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <StackPanel Spacing="12">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Name="AccountTitle" FontSize="14" Text="未登录" />
+                            <TextBlock
+                                x:Name="AccountDescription"
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="粘贴 Pixiv refresh_token 后登录；token 只保存在本机，不会写进源码" />
+                        </StackPanel>
+                        <Button
+                            x:Name="SignOutButton"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Click="OnSignOutClick"
+                            Content="退出登录"
+                            Visibility="Collapsed" />
+                    </Grid>
+
+                    <Grid x:Name="TokenRow" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <PasswordBox
+                            x:Name="TokenBox"
+                            PlaceholderText="refresh_token"
+                            PasswordRevealMode="Peek" />
+                        <Button
+                            x:Name="SignInButton"
+                            Grid.Column="1"
+                            Click="OnSignInClick"
+                            Content="登录"
+                            Style="{StaticResource AccentButtonStyle}" />
+                        <Button
+                            x:Name="WebLoginButton"
+                            Grid.Column="2"
+                            Click="OnWebLoginClick"
+                            Content="网页登录"
+                            ToolTipService.ToolTip="打开 Pixiv 网页登录，自动获取 refresh_token 和 cookie（收藏集需要）" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!--  关于  -->
+            <TextBlock
+                Margin="0,8,0,0"
+                Style="{StaticResource SectionHeaderTextBlockStyle}"
+                Text="关于" />
+
+            <Border Style="{StaticResource SurfaceCardStyle}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock FontSize="14" Text="Pixiv Viewer" />
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="12">
+                            <HyperlinkButton Click="OnChangelogClick" Content="更新日志" />
+                            <TextBlock
+                                x:Name="VersionText"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="v1.0.1" />
+                        </StackPanel>
+                    </Grid>
+                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock FontSize="14" Text="Pixiv API" />
+                        <TextBlock
+                            x:Name="ApiStatus"
+                            Grid.Column="1"
+                            Style="{StaticResource MetaTextBlockStyle}"
+                            Text="已接入 · 自建反代" />
+                    </Grid>
+                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="反代服务" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="基于 vmoranv/pixiv-proxy 修改优化 · 自建部署" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="2">
+                            <HyperlinkButton Click="OnOpenRepoClick" Content="仓库" />
+                            <HyperlinkButton Click="OnOpenProxyRepoClick" Content="源项目" />
+                        </StackPanel>
+                    </Grid>
+                    <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+                    <TextBlock
+                        Style="{StaticResource MetaTextBlockStyle}"
+                        Text="WinUI 3 · Windows App SDK · Fluent Design / Mica" />
+                </StackPanel>
+            </Border>
+
+            <InfoBar
+                x:Name="Hint"
+                IsOpen="False"
+                Severity="Informational" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

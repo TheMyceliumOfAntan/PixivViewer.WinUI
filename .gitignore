@@ -1,0 +1,21 @@
+# 构建产物
+bin/
+obj/
+[Pp]ublish/
+[Dd]ebug/
+[Rr]elease/
+
+# Visual Studio / Rider
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# 工具缓存
+.playwright-mcp/
+.memory/
+
+# 系统
+Thumbs.db
+desktop.ini

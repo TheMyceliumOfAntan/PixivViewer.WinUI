@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Pixiv_Viewer_WinUI.Views.MyPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Pixiv_Viewer_WinUI.Controls"
+    xmlns:models="using:Pixiv_Viewer_WinUI.Models"
+    NavigationCacheMode="Required"
+    Background="Transparent">
+
+    <Grid Padding="28,16,24,0" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Spacing="2">
+            <TextBlock Style="{StaticResource PageTitleTextBlockStyle}" Text="账号" />
+            <TextBlock
+                x:Name="Subtitle"
+                Style="{StaticResource PageSubtitleTextBlockStyle}"
+                Text="收藏、关注与自己的作品" />
+        </StackPanel>
+
+        <!--  账号卡片  -->
+        <Border
+            x:Name="ProfileCard"
+                RenderTransformOrigin="0.5,0"
+            Grid.Row="1"
+            Padding="20,16"
+            Style="{StaticResource SurfaceCardStyle}">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <PersonPicture
+                    x:Name="Avatar"
+                    Width="64"
+                    Height="64"
+                    DisplayName="未" />
+
+                <StackPanel
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Spacing="4">
+                    <TextBlock
+                        x:Name="UserName"
+                        FontSize="18"
+                        FontWeight="SemiBold"
+                        Text="未登录" />
+                    <TextBlock
+                        x:Name="UserAccount"
+                        Style="{StaticResource MetaTextBlockStyle}"
+                        Text="登录后可同步收藏、关注与自己的作品" />
+                    <StackPanel
+                        Margin="0,4,0,0"
+                        Orientation="Horizontal"
+                        Spacing="20">
+                        <StackPanel>
+                            <TextBlock
+                                x:Name="WorkCount"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Text="—" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="作品" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock
+                                x:Name="FollowingCount"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Text="—" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关注" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock
+                                x:Name="BookmarkCountText"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Text="—" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="收藏" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <Button
+                    x:Name="LoginButton"
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Click="OnLoginClick"
+                    Content="登录 Pixiv"
+                    Style="{StaticResource AccentButtonStyle}" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <SelectorBar x:Name="SectionSelector" SelectionChanged="OnSectionChanged">
+                <SelectorBarItem
+                    IsSelected="True"
+                    Tag="public"
+                    Text="公开收藏" />
+                <SelectorBarItem Tag="private" Text="私密收藏" />
+                <SelectorBarItem Tag="following" Text="关注" />
+                <SelectorBarItem Tag="works" Text="我的作品" />
+            </SelectorBar>
+
+            <Button
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Click="OnFilterClick"
+                ToolTipService.ToolTip="筛选（AI / R-18 / 黑名单）">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon FontSize="14" Glyph="&#xE71C;" />
+                    <TextBlock Text="筛选" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!--  内容  -->
+        <Grid Grid.Row="3">
+            <controls:IllustrationGrid
+                x:Name="Illustrations"
+                CardActionRequested="OnCardAction"
+                ItemInvoked="OnItemInvoked"
+                LoadMoreRequested="OnLoadMoreRequested" />
+
+            <ListView
+                x:Name="FollowingList"
+                Padding="0,0,0,24"
+                SelectionMode="None"
+                Visibility="Collapsed">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0,0,0,4" />
+                        <Setter Property="MinHeight" Value="0" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:PixivUser">
+                        <Border
+                            Padding="12,10"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Click="OnUserClick"
+                                    Style="{StaticResource TextLinkButtonStyle}"
+                                    Tag="{x:Bind}"
+                                    ToolTipService.ToolTip="查看作者主页">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <PersonPicture
+                                            Width="40"
+                                            Height="40"
+                                            DisplayName="{x:Bind Name}"
+                                            ProfilePicture="{x:Bind AvatarUrl, Converter={StaticResource UrlToImage}}" />
+
+                                        <StackPanel
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Spacing="2">
+                                            <TextBlock
+                                                FontSize="14"
+                                                FontWeight="SemiBold"
+                                                Text="{x:Bind Name}" />
+                                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="{x:Bind AccountText}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+
+                                <StackPanel
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="14">
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource MetaTextBlockStyle}"
+                                        Text="{x:Bind IllustrationCountText}"
+                                        Visibility="{x:Bind IllustrationCount, Converter={StaticResource PositiveIntToVisibility}}" />
+                                    <Button
+                                        Tag="{x:Bind}"
+                                        Click="OnUnfollowClick"
+                                        Content="已关注" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <StackPanel
+                x:Name="EmptyState"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="10"
+                Visibility="Collapsed">
+                <FontIcon
+                    x:Name="EmptyGlyph"
+                    FontSize="36"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    Glyph="&#xE734;" />
+                <TextBlock
+                    x:Name="EmptyTitle"
+                    Style="{StaticResource EmptyStateTitleStyle}"
+                    Text="这里还是空的" />
+                <TextBlock
+                    x:Name="EmptyMessage"
+                    Style="{StaticResource EmptyStateMessageStyle}"
+                    Text="登录并收藏作品后，就能在这里看到。" />
+            </StackPanel>
+
+            <ProgressRing
+                x:Name="LoadingRing"
+                Width="36"
+                Height="36"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center" />
+        </Grid>
+
+        <TeachingTip
+            x:Name="LoginTip"
+            Grid.RowSpan="4"
+            IsOpen="False"
+            Subtitle="界面已就绪，接入 Pixiv OAuth（PKCE）后即可使用。"
+            Target="{x:Bind LoginButton}"
+            Title="登录功能待接入" />
+    </Grid>
+</Page>

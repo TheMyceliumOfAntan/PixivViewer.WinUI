@@ -1,0 +1,890 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Pixiv_Viewer_WinUI.Views.IllustrationDetailPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Pixiv_Viewer_WinUI.Models"
+    xmlns:controls="using:Pixiv_Viewer_WinUI.Controls"
+    Background="Transparent">
+
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator Key="F11" Invoked="OnFullScreenAccelerator" />
+        <KeyboardAccelerator Key="Escape" Invoked="OnEscapeAccelerator" />
+        <KeyboardAccelerator Key="Left" Invoked="OnPrevAccelerator" />
+        <KeyboardAccelerator Key="Right" Invoked="OnNextAccelerator" />
+    </Page.KeyboardAccelerators>
+
+    <Grid x:Name="Root">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="LayoutStates">
+                <!--  窄窗口：信息面板堆叠到图片下方  -->
+                <VisualState x:Name="NarrowState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="InfoColumn.Width" Value="0" />
+                        <Setter Target="InfoRow.Height" Value="Auto" />
+                        <Setter Target="InfoPanel.(Grid.Row)" Value="1" />
+                        <Setter Target="InfoPanel.(Grid.Column)" Value="0" />
+                        <Setter Target="InfoPanel.MaxHeight" Value="360" />
+                        <Setter Target="InfoPanel.BorderThickness" Value="0,1,0,0" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <!--  宽窗口：左图右信息  -->
+                <VisualState x:Name="WideState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1000" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="InfoColumn.Width" Value="380" />
+                        <Setter Target="InfoRow.Height" Value="0" />
+                        <Setter Target="InfoPanel.(Grid.Row)" Value="0" />
+                        <Setter Target="InfoPanel.(Grid.Column)" Value="1" />
+                        <Setter Target="InfoPanel.MaxHeight" Value="100000" />
+                        <Setter Target="InfoPanel.BorderThickness" Value="1,0,0,0" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  ================= 工具栏  =================  -->
+        <Border
+            Grid.Row="0"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+            BorderThickness="0,0,0,1">
+            <Grid
+                Height="52"
+                Padding="8,0,12,0"
+                ColumnSpacing="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button
+                    x:Name="BackButton"
+                    Click="OnBackClick"
+                    Style="{StaticResource ToolbarIconButtonStyle}"
+                    ToolTipService.ToolTip="返回 (Esc)">
+                    <FontIcon FontSize="16" Glyph="&#xE72B;" />
+                </Button>
+
+                <StackPanel
+                    Grid.Column="1"
+                    Margin="8,0"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <TextBlock
+                        MaxWidth="520"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Text="{x:Bind View.Title, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Style="{StaticResource MetaTextBlockStyle}"
+                        Text="{x:Bind View.PageCountText, Mode=OneWay}"
+                        Visibility="{x:Bind View.HasMultiplePages, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+
+                <StackPanel
+                    Grid.Column="2"
+                    Orientation="Horizontal"
+                    Spacing="4">
+                    <SplitButton
+                        x:Name="BookmarkButton"
+                        Click="OnBookmarkClick"
+                        ToolTipService.ToolTip="收藏（下拉可选私密收藏）">
+                        <SplitButton.Flyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem
+                                    Click="OnPrivateBookmarkClick"
+                                    Text="{x:Bind View.BookmarkMenuText, Mode=OneWay}">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE72E;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </SplitButton.Flyout>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon
+                                FontSize="14"
+                                Foreground="{x:Bind View.BookmarkIconBrush, Mode=OneWay}"
+                                Glyph="{x:Bind View.BookmarkGlyph, Mode=OneWay}" />
+                            <TextBlock Text="{x:Bind View.BookmarkActionText, Mode=OneWay}" />
+                        </StackPanel>
+                    </SplitButton>
+
+                    <Button Click="OnDownloadClick" ToolTipService.ToolTip="下载">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontSize="14" Glyph="&#xE896;" />
+                            <TextBlock Text="下载" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button
+                        Click="OnOpenInBrowserClick"
+                        Style="{StaticResource ToolbarIconButtonStyle}"
+                        ToolTipService.ToolTip="在浏览器打开">
+                        <FontIcon FontSize="14" Glyph="&#xE774;" />
+                    </Button>
+
+                    <Button Style="{StaticResource ToolbarIconButtonStyle}" ToolTipService.ToolTip="更多">
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Click="OnCopyLinkClick" Text="复制作品链接" />
+                                <MenuFlyoutItem Click="OnOpenInBrowserClick" Text="在浏览器打开" />
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Click="OnReportClick" Text="举报作品" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                        <FontIcon FontSize="14" Glyph="&#xE712;" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!--  ================= 内容  =================  -->
+        <Grid x:Name="ContentGrid" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ViewerColumn" Width="*" />
+                <ColumnDefinition x:Name="InfoColumn" Width="380" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="ViewerRow" Height="*" />
+                <RowDefinition x:Name="InfoRow" Height="0" />
+            </Grid.RowDefinitions>
+
+            <!--  图片区  -->
+            <Grid
+                x:Name="Viewer"
+                Grid.Row="0"
+                Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <ScrollViewer
+                        x:Name="ImageScroller"
+                        Background="Transparent"
+                        HorizontalScrollBarVisibility="Auto"
+                        HorizontalScrollMode="Auto"
+                        MaxZoomFactor="4"
+                        MinZoomFactor="0.5"
+                        VerticalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Auto"
+                        ZoomMode="Enabled">
+                        <Grid x:Name="ImageHost" RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <TranslateTransform x:Name="ImageShift" />
+                            </Grid.RenderTransform>
+
+                            <Grid.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Click="OnSaveImageClick" Text="另存为…">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE792;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="OnImageInfoClick" Text="详情">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE946;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="OnFullScreenClick" Text="全屏查看">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE740;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </Grid.ContextFlyout>
+
+                            <!--  骨架：图片加载完成前显示  -->
+                            <Rectangle x:Name="ImageSkeleton" Fill="{ThemeResource SkeletonFillBrush}" />
+
+                            <Image
+                                x:Name="PageImage"
+                                controls:CachedImage.DecodeWidth="1200"
+                                controls:CachedImage.HighQualityUrl="{x:Bind View.CurrentOriginalUrl, Mode=OneWay}"
+                                controls:CachedImage.Url="{x:Bind View.CurrentImageUrl, Mode=OneWay}"
+                                ImageFailed="OnPageImageFailed"
+                                ImageOpened="OnPageImageOpened"
+                                Opacity="0"
+                                Stretch="Uniform">
+                                <Image.OpacityTransition>
+                                    <ScalarTransition Duration="0:0:0.2" />
+                                </Image.OpacityTransition>
+                            </Image>
+
+                            <ProgressRing
+                                x:Name="ImageLoading"
+                                Width="32"
+                                Height="32"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                IsActive="False" />
+
+                            <TextBlock
+                                x:Name="ImageErrorText"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="图片加载失败，右键可另存为"
+                                Visibility="Collapsed" />
+
+                            <!--  被设置屏蔽（R-18 / R-18G / AI）时的占位  -->
+                            <Grid
+                                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                                Visibility="{x:Bind View.IsBlocked, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="10">
+                                    <FontIcon
+                                        HorizontalAlignment="Center"
+                                        FontSize="40"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Glyph="&#xE72E;" />
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        FontSize="16"
+                                        FontWeight="SemiBold"
+                                        Text="作品无法显示" />
+                                    <TextBlock
+                                        MaxWidth="360"
+                                        HorizontalAlignment="Center"
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{x:Bind View.BlockReason, Mode=OneWay}"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        MaxWidth="360"
+                                        HorizontalAlignment="Center"
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Text="可在「设置 → 数据」里打开对应开关"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </ScrollViewer>
+
+                    <!--  翻页  -->
+                    <Button
+                        x:Name="PrevButton"
+                        Margin="16,0,0,0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Click="OnPrevClick"
+                        IsEnabled="{x:Bind View.CanGoPrevious, Mode=OneWay}"
+                        Style="{StaticResource ViewerNavButtonStyle}"
+                        ToolTipService.ToolTip="上一页 (←)"
+                        Visibility="{x:Bind View.HasMultiplePages, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                        <FontIcon FontSize="14" Glyph="&#xE76B;" />
+                    </Button>
+
+                    <Button
+                        x:Name="NextButton"
+                        Margin="0,0,16,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Click="OnNextClick"
+                        IsEnabled="{x:Bind View.CanGoNext, Mode=OneWay}"
+                        Style="{StaticResource ViewerNavButtonStyle}"
+                        ToolTipService.ToolTip="下一页 (→)"
+                        Visibility="{x:Bind View.HasMultiplePages, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                        <FontIcon FontSize="14" Glyph="&#xE76C;" />
+                    </Button>
+
+                    <Border
+                        Margin="0,0,0,72"
+                        Padding="10,4"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Background="#A6000000"
+                        CornerRadius="10"
+                        Visibility="{x:Bind View.HasMultiplePages, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="White"
+                            Text="{x:Bind View.PageIndicator, Mode=OneWay}" />
+                    </Border>
+
+                    <!--  缩放控制条  -->
+                    <Border
+                        x:Name="ZoomBar"
+                        Margin="0,0,0,14"
+                        Padding="6,4"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Translation="0,0,16"
+                        Visibility="Collapsed">
+                        <Border.Shadow>
+                            <ThemeShadow />
+                        </Border.Shadow>
+                        <StackPanel
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="2">
+                            <Button
+                                Click="OnFitClick"
+                                Style="{StaticResource ToolbarIconButtonStyle}"
+                                ToolTipService.ToolTip="适应窗口">
+                                <FontIcon FontSize="14" Glyph="&#xE9A6;" />
+                            </Button>
+
+                            <ComboBox
+                                x:Name="ZoomCombo"
+                                MinWidth="88"
+                                Margin="2,0"
+                                VerticalAlignment="Center"
+                                PlaceholderText="100%"
+                                SelectionChanged="OnZoomPresetChanged">
+                                <ComboBoxItem Content="50%" Tag="50" />
+                                <ComboBoxItem Content="75%" Tag="75" />
+                                <ComboBoxItem Content="100%" Tag="100" IsSelected="True" />
+                                <ComboBoxItem Content="150%" Tag="150" />
+                                <ComboBoxItem Content="200%" Tag="200" />
+                                <ComboBoxItem Content="400%" Tag="400" />
+                            </ComboBox>
+
+                            <Button
+                                Click="OnZoomOutClick"
+                                Style="{StaticResource ToolbarIconButtonStyle}"
+                                ToolTipService.ToolTip="缩小">
+                                <FontIcon FontSize="14" Glyph="&#xE71F;" />
+                            </Button>
+
+                            <Slider
+                                x:Name="ZoomSlider"
+                                Width="130"
+                                VerticalAlignment="Center"
+                                Maximum="400"
+                                Minimum="50"
+                                StepFrequency="10"
+                                Value="100"
+                                ValueChanged="OnZoomSliderChanged" />
+
+                            <Button
+                                Click="OnZoomInClick"
+                                Style="{StaticResource ToolbarIconButtonStyle}"
+                                ToolTipService.ToolTip="放大">
+                                <FontIcon FontSize="14" Glyph="&#xE8A3;" />
+                            </Button>
+
+                            <Rectangle
+                                Width="1"
+                                Height="18"
+                                Margin="4,0"
+                                Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                            <Button
+                                Click="OnFullScreenClick"
+                                Style="{StaticResource ToolbarIconButtonStyle}"
+                                ToolTipService.ToolTip="全屏查看 (F11)">
+                                <FontIcon FontSize="14" Glyph="&#xE740;" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!--  操作反馈浮层（实色背景，避免被图片“透视”）  -->
+                    <Border
+                        x:Name="Toast"
+                        Margin="12"
+                        Padding="12,8"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Translation="0,0,16"
+                        Visibility="Collapsed">
+                        <Border.Shadow>
+                            <ThemeShadow />
+                        </Border.Shadow>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontSize="14"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Glyph="&#xE946;" />
+                            <TextBlock
+                                x:Name="ToastText"
+                                Grid.Column="1"
+                                MaxWidth="420"
+                                VerticalAlignment="Center"
+                                FontSize="13"
+                                TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
+
+                    <!--  空状态  -->
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="10"
+                        Visibility="{x:Bind View.HasItem, Mode=OneWay, Converter={StaticResource InverseBoolToVisibility}}">
+                        <FontIcon
+                            FontSize="36"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                            Glyph="&#xE783;" />
+                        <TextBlock Style="{StaticResource EmptyStateTitleStyle}" Text="没有可显示的作品" />
+                        <TextBlock Style="{StaticResource EmptyStateMessageStyle}" Text="请从首页、排行榜或搜索结果中打开一件作品。" />
+                    </StackPanel>
+                </Grid>
+
+                <!--  缩略图条  -->
+                <Border
+                    x:Name="ThumbBar"
+                    Grid.Row="1"
+                    Padding="12,8"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,1,0,0"
+                    Visibility="{x:Bind View.HasMultiplePages, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                    <ListView
+                        x:Name="ThumbList"
+                        Height="52"
+                        Padding="0"
+                        SelectionChanged="OnThumbSelectionChanged"
+                        SelectionMode="Single"
+                        ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                        ScrollViewer.HorizontalScrollMode="Enabled"
+                        ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                        ScrollViewer.VerticalScrollMode="Disabled">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <ItemsStackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Width" Value="48" />
+                                <Setter Property="Height" Value="48" />
+                                <Setter Property="MinWidth" Value="0" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0,0,6,0" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:PageThumbnail">
+                                <Grid>
+                                    <Rectangle
+                                        Fill="{ThemeResource SkeletonFillBrush}"
+                                        RadiusX="6"
+                                        RadiusY="6" />
+                                    <Image
+                                        Source="{x:Bind ImageUrl, Converter={StaticResource UrlToImage}}"
+                                        Stretch="UniformToFill" />
+                                    <Border
+                                        Margin="2"
+                                        Padding="4,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        Background="#66000000"
+                                        CornerRadius="4">
+                                        <TextBlock
+                                            FontSize="10"
+                                            Foreground="White"
+                                            Text="{x:Bind Caption}" />
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Border>
+            </Grid>
+
+            <!--  信息面板  -->
+            <Border
+                x:Name="InfoPanel"
+                Grid.Row="0"
+                Grid.Column="1"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="1,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ScrollViewer
+                        Grid.Row="0"
+                        Padding="18,16,18,20"
+                        VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="14">
+
+                            <!--  标题  -->
+                            <TextBlock
+                                FontSize="19"
+                                FontWeight="SemiBold"
+                                Text="{x:Bind View.Title, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+
+                            <!--  作者  -->
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Click="OnAuthorClick"
+                                    Style="{StaticResource TextLinkButtonStyle}"
+                                    ToolTipService.ToolTip="查看作者主页">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <PersonPicture
+                                            x:Name="AuthorAvatar"
+                                            Width="40"
+                                            Height="40"
+                                            DisplayName="{x:Bind View.AuthorName, Mode=OneWay}"
+                                            ProfilePicture="{x:Bind View.AuthorAvatarUrl, Mode=OneWay, Converter={StaticResource UrlToImage}}" />
+
+                                        <StackPanel
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Spacing="2">
+                                            <TextBlock
+                                                FontSize="14"
+                                                FontWeight="SemiBold"
+                                                Text="{x:Bind View.AuthorName, Mode=OneWay}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="{x:Bind View.AuthorAccount, Mode=OneWay}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+
+                                <Button
+                                    x:Name="FollowButton"
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Click="OnFollowClick">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="14" Glyph="&#xE710;" />
+                                        <TextBlock x:Name="FollowLabel" Text="关注" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <!--  统计  -->
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border
+                                    Padding="8"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    CornerRadius="6">
+                                    <StackPanel Spacing="2">
+                                        <FontIcon
+                                            HorizontalAlignment="Center"
+                                            FontSize="14"
+                                            Glyph="&#xEB51;" />
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind View.LikeText, Mode=OneWay}" />
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            Style="{StaticResource MetaTextBlockStyle}"
+                                            Text="赞" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border
+                                    Grid.Column="1"
+                                    Padding="8"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    CornerRadius="6">
+                                    <StackPanel Spacing="2">
+                                        <FontIcon
+                                            HorizontalAlignment="Center"
+                                            FontSize="14"
+                                            Foreground="{x:Bind View.BookmarkIconBrush, Mode=OneWay}"
+                                            Glyph="{x:Bind View.BookmarkGlyph, Mode=OneWay}" />
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind View.BookmarkText, Mode=OneWay}" />
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            Style="{StaticResource MetaTextBlockStyle}"
+                                            Text="收藏" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border
+                                    Grid.Column="2"
+                                    Padding="8"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    CornerRadius="6">
+                                    <StackPanel Spacing="2">
+                                        <FontIcon
+                                            HorizontalAlignment="Center"
+                                            FontSize="14"
+                                            Glyph="&#xE890;" />
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind View.ViewText, Mode=OneWay}" />
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            Style="{StaticResource MetaTextBlockStyle}"
+                                            Text="浏览" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!--  标签  -->
+                            <ItemsRepeater ItemsSource="{x:Bind View.Tags, Mode=OneWay}" Visibility="{x:Bind View.HasTags, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsRepeater.Layout>
+                                    <controls:WrapLayout Spacing="6" />
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate x:DataType="models:IllustTag">
+                                        <Button
+                                            Click="OnTagClick"
+                                            Style="{StaticResource TagChipButtonStyle}"
+                                            Tag="{x:Bind}"
+                                            ToolTipService.ToolTip="{x:Bind Name}">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <TextBlock FontSize="12" Text="{x:Bind Name}" />
+                                                <TextBlock
+                                                    FontSize="11"
+                                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                    Text="{x:Bind Translated}"
+                                                    Visibility="{x:Bind HasTranslation, Converter={StaticResource BoolToVisibility}}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+
+                            <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+
+                            <!--  简介  -->
+                            <StackPanel Spacing="6">
+                                <TextBlock Style="{StaticResource SectionHeaderTextBlockStyle}" Text="作品说明" />
+                                <RichTextBlock
+                                    x:Name="DescriptionText"
+                                    FontSize="13"
+                                    MaxLines="{x:Bind View.DescriptionMaxLines, Mode=OneWay}"
+                                    TextTrimming="CharacterEllipsis"
+                                    TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                    <HyperlinkButton
+                                        Padding="0"
+                                        Click="OnToggleDescriptionClick"
+                                        Content="{x:Bind View.DescriptionToggleText, Mode=OneWay}"
+                                        Visibility="{x:Bind View.CanExpandDescription, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+                                    <HyperlinkButton
+                                        Padding="0"
+                                        Click="OnTranslateDescriptionClick"
+                                        Content="{x:Bind View.DescriptionTranslateButtonText, Mode=OneWay}"
+                                        ToolTipService.ToolTip="由 B 站 Index-Translate 提供翻译（失败时回退 MyMemory）" />
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="{x:Bind View.CreatedText, Mode=OneWay}" />
+                            </StackPanel>
+
+                            <Rectangle Style="{StaticResource DividerRectangleStyle}" />
+
+                            <!--  评论  -->
+                            <TextBlock
+                                Style="{StaticResource SectionHeaderTextBlockStyle}"
+                                Text="{x:Bind View.CommentsHeader, Mode=OneWay}" />
+
+                            <TextBlock
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="{x:Bind View.CommentsEmptyText, Mode=OneWay}"
+                                TextWrapping="Wrap"
+                                Visibility="{x:Bind View.HasComments, Mode=OneWay, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                            <ItemsRepeater ItemsSource="{x:Bind View.Comments, Mode=OneWay}">
+                                <ItemsRepeater.Layout>
+                                    <StackLayout Spacing="12" />
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate x:DataType="models:Comment">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Button
+                                                VerticalAlignment="Top"
+                                                Click="OnCommentAuthorClick"
+                                                Style="{StaticResource TextLinkButtonStyle}"
+                                                Tag="{x:Bind User}"
+                                                ToolTipService.ToolTip="查看作者主页">
+                                                <PersonPicture
+                                                    Width="28"
+                                                    Height="28"
+                                                    DisplayName="{x:Bind User.Name}"
+                                                    ProfilePicture="{x:Bind User.AvatarUrl, Converter={StaticResource UrlToImage}}" />
+                                            </Button>
+
+                                            <StackPanel
+                                                Grid.Column="1"
+                                                Spacing="2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock
+                                                        FontSize="12"
+                                                        FontWeight="SemiBold"
+                                                        Text="{x:Bind User.Name}" />
+                                                    <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="{x:Bind TimeText}" />
+                                                </StackPanel>
+                                                <controls:EmojiTextBlock
+                                                    FontSize="12"
+                                                    Text="{x:Bind DisplayText, Mode=OneWay}"
+                                                    Visibility="{x:Bind HasText, Converter={StaticResource BoolToVisibility}}" />
+                                                <Image
+                                                    MaxHeight="64"
+                                                    HorizontalAlignment="Left"
+                                                    Source="{x:Bind StampUrl, Converter={StaticResource UrlToImage}}"
+                                                    Visibility="{x:Bind HasStamp, Converter={StaticResource BoolToVisibility}}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <HyperlinkButton
+                                                        Padding="0"
+                                                        Click="OnTranslateCommentClick"
+                                                        Content="{x:Bind TranslateButtonText, Mode=OneWay}"
+                                                        FontSize="11"
+                                                        Tag="{x:Bind}"
+                                                        Visibility="{x:Bind HasText, Converter={StaticResource BoolToVisibility}}" />
+                                                    <StackPanel
+                                                        Orientation="Horizontal"
+                                                        Spacing="4"
+                                                        Visibility="{x:Bind LikeText, Converter={StaticResource StringToVisibility}}">
+                                                        <FontIcon
+                                                            FontSize="10"
+                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                            Glyph="&#xEB51;" />
+                                                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="{x:Bind LikeText}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!--  评论输入  -->
+                    <Border
+                        Grid.Row="1"
+                        Padding="14,10"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0"
+                        Visibility="{x:Bind View.ShowCommentInput, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox
+                                x:Name="CommentBox"
+                                MaxLength="140"
+                                PlaceholderText="写下你的评论…"
+                                Text="{x:Bind View.NewCommentText, Mode=TwoWay}" />
+
+                            <Button
+                                Grid.Column="1"
+                                Click="OnSendCommentClick"
+                                Content="发送"
+                                Style="{StaticResource AccentButtonStyle}" />
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!--  全屏查看（覆盖整页）  -->
+        <Grid
+            x:Name="FullScreenOverlay"
+            Grid.RowSpan="2"
+            Background="#F2000000"
+            RightTapped="OnFullScreenRightTapped"
+            Visibility="Collapsed">
+            <ScrollViewer
+                x:Name="FullScreenScroller"
+                Background="Transparent"
+                HorizontalScrollBarVisibility="Hidden"
+                HorizontalScrollMode="Enabled"
+                MaxZoomFactor="8"
+                MinZoomFactor="0.5"
+                VerticalScrollBarVisibility="Hidden"
+                VerticalScrollMode="Enabled"
+                ZoomMode="Enabled">
+                <Grid x:Name="FullScreenHost">
+                    <Image
+                        controls:CachedImage.DecodeWidth="2000"
+                        controls:CachedImage.HighQualityUrl="{x:Bind View.CurrentOriginalUrl, Mode=OneWay}"
+                        controls:CachedImage.Url="{x:Bind View.CurrentImageUrl, Mode=OneWay}"
+                        Stretch="Uniform" />
+                </Grid>
+            </ScrollViewer>
+
+            <TextBlock
+                Margin="0,0,0,22"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                FontSize="12"
+                Foreground="White"
+                Opacity="0.7"
+                Text="滚轮缩放 · 拖动查看细节 · Esc / 右键退出全屏" />
+
+            <Button
+                Margin="16"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Click="OnExitFullScreenClick"
+                Foreground="White"
+                Style="{StaticResource ToolbarIconButtonStyle}"
+                ToolTipService.ToolTip="退出全屏 (Esc)">
+                <FontIcon FontSize="14" Glyph="&#xE711;" />
+            </Button>
+        </Grid>
+    </Grid>
+</Page>

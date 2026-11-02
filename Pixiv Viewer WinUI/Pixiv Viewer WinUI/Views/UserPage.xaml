@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Pixiv_Viewer_WinUI.Views.UserPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Pixiv_Viewer_WinUI.Controls"
+    Background="Transparent">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  工具栏  -->
+        <Border
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+            BorderThickness="0,0,0,1">
+            <Grid
+                Height="52"
+                Padding="8,0,12,0"
+                ColumnSpacing="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button
+                    Click="OnBackClick"
+                    Style="{StaticResource ToolbarIconButtonStyle}"
+                    ToolTipService.ToolTip="返回 (Esc)">
+                    <FontIcon FontSize="16" Glyph="&#xE72B;" />
+                </Button>
+
+                <StackPanel
+                    Grid.Column="1"
+                    Margin="8,0"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="10">
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Text="作者主页" />
+                    <TextBlock
+                        x:Name="HintText"
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+
+                <Button
+                    Grid.Column="2"
+                    Click="OnOpenInBrowserClick"
+                    Style="{StaticResource ToolbarIconButtonStyle}"
+                    ToolTipService.ToolTip="在浏览器打开">
+                    <FontIcon FontSize="14" Glyph="&#xE774;" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <Grid
+            Grid.Row="1"
+            Padding="28,20,24,0"
+            RowSpacing="14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!--  资料卡  -->
+            <Border
+                x:Name="ProfileCard"
+                RenderTransformOrigin="0.5,0"
+                Padding="20,16"
+                Style="{StaticResource SurfaceCardStyle}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <PersonPicture
+                        x:Name="Avatar"
+                        Width="72"
+                        Height="72"
+                        DisplayName="?">
+                        <PersonPicture.ContextFlyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Click="OnSaveAvatarClick" Text="另存为…">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE792;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Click="OnCopyAvatarUrlClick" Text="复制头像链接">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE8C8;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </PersonPicture.ContextFlyout>
+                    </PersonPicture>
+
+                    <StackPanel
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Spacing="4">
+                        <TextBlock
+                            x:Name="UserName"
+                            FontSize="20"
+                            FontWeight="SemiBold"
+                            Text="—">
+                            <TextBlock.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Click="OnCopyNameClick" Text="复制名称" />
+                                    <MenuFlyoutItem Click="OnCopyIdClick" Text="复制用户 ID" />
+                                    <MenuFlyoutItem Click="OnCopyLinkClick" Text="复制主页链接" />
+                                </MenuFlyout>
+                            </TextBlock.ContextFlyout>
+                        </TextBlock>
+                        <TextBlock x:Name="UserAccount" Style="{StaticResource MetaTextBlockStyle}" />
+                        <TextBlock
+                            x:Name="UserBio"
+                            MaxLines="2"
+                            FontSize="13"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="Wrap" />
+
+                        <StackPanel
+                            Margin="0,6,0,0"
+                            Orientation="Horizontal"
+                            Spacing="22">
+                            <StackPanel>
+                                <TextBlock
+                                    x:Name="WorkCount"
+                                    FontSize="15"
+                                    FontWeight="SemiBold"
+                                    Text="—" />
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="作品" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock
+                                    x:Name="FollowingCount"
+                                    FontSize="15"
+                                    FontWeight="SemiBold"
+                                    Text="—" />
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="关注" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock
+                                    x:Name="BookmarkCountText"
+                                    FontSize="15"
+                                    FontWeight="SemiBold"
+                                    Text="—" />
+                                <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="收藏" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <SplitButton
+                            x:Name="CopyButton"
+                            Click="OnCopyIdClick"
+                            ToolTipService.ToolTip="复制（默认复制用户 ID）">
+                            <SplitButton.Flyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Click="OnCopyIdClick" Text="复制用户 ID" />
+                                    <MenuFlyoutItem Click="OnCopyLinkClick" Text="复制主页链接" />
+                                    <MenuFlyoutItem Click="OnCopyNameClick" Text="复制用户名" />
+                                </MenuFlyout>
+                            </SplitButton.Flyout>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                                <TextBlock Text="复制" />
+                            </StackPanel>
+                        </SplitButton>
+
+                        <Button x:Name="FollowButton" Click="OnFollowClick">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="14" Glyph="&#xE710;" />
+                                <TextBlock x:Name="FollowLabel" Text="关注" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <TextBlock
+                    VerticalAlignment="Center"
+                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                    Text="作品" />
+
+                <StackPanel
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="10">
+                    <TextBlock
+                        x:Name="CountText"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource MetaTextBlockStyle}" />
+                    <Button Click="OnFilterClick" ToolTipService.ToolTip="筛选（AI / R-18 / 黑名单）">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontSize="14" Glyph="&#xE71C;" />
+                            <TextBlock Text="筛选" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!--  作品  -->
+            <Grid Grid.Row="2">
+                <controls:IllustrationGrid
+                    x:Name="Illustrations"
+                    CardActionRequested="OnCardAction"
+                    ItemInvoked="OnItemInvoked"
+                    LoadMoreRequested="OnLoadMoreRequested" />
+
+                <StackPanel
+                    x:Name="EmptyState"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="10"
+                    Visibility="Collapsed">
+                    <FontIcon
+                        FontSize="36"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Glyph="&#xEB9F;" />
+                    <TextBlock x:Name="EmptyTitle" Style="{StaticResource EmptyStateTitleStyle}" Text="还没有作品" />
+                    <TextBlock
+                        x:Name="EmptyMessage"
+                        Style="{StaticResource EmptyStateMessageStyle}"
+                        Text="这位作者还没有公开作品。" />
+                </StackPanel>
+
+                <ProgressRing
+                    x:Name="LoadingRing"
+                    Width="36"
+                    Height="36"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>
