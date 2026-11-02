@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
+using Pixiv_Viewer_WinUI.Services;
 using Pixiv_Viewer_WinUI.Services.Pixiv;
 using Windows.Graphics;
 
@@ -31,10 +32,17 @@ public sealed partial class LoginWindow : Window
     private const string ClientId = "MOBrBDS8blbauoSck0ZfDbtuzpyT";
     private const string ClientSecret = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj";
     private const string RedirectUri = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback";
-    private const string ProxyBase = "https://pixiv.junsi233.top";
 
     private readonly string _codeVerifier;
     private readonly TaskCompletionSource<LoginResult?> _completion = new();
+
+    /// <summary>
+    /// WebView2 一个用户数据目录只能对应一个浏览器进程，环境参数创建后不能改，
+    /// 所以隧道与环境在整个进程内复用。
+    /// </summary>
+    private static FrontingProxyServer? _environmentProxy;
+    private static CoreWebView2Environment? _environment;
+    private static string? _environmentKey;
 
     private bool _closing;
     private bool _webClosed;
@@ -86,13 +94,114 @@ public sealed partial class LoginWindow : Window
             return;
         }
 
+        _ = NavigateAsync();
+    }
+
+    /// <summary>
+    /// 域前置模式下让 WebView2 走本机 CONNECT 隧道：隧道只对 ClientHello 做分片转发，
+    /// 不终止 TLS，因此证书校验、SNI、HTTP/2 全部保持原样。
+    /// </summary>
+    private async Task NavigateAsync()
+    {
         try
         {
-            Web.Source = new Uri(LoginUrl);
+            var environment = await GetEnvironmentAsync();
+            if (environment is not null)
+            {
+                await Web.EnsureCoreWebView2Async(environment);
+            }
+
+            if (!_closing)
+            {
+                Web.Source = new Uri(LoginUrl);
+            }
+        }
+        catch (Exception ex)
+        {
+            PixivDiagnostics.Write($"login navigate failed: {ex.Message}");
+
+            // 环境创建失败时退回默认环境（反代模式仍可登录）
+            try
+            {
+                if (!_closing)
+                {
+                    Web.Source = new Uri(LoginUrl);
+                }
+            }
+            catch (Exception)
+            {
+                // 窗口已关闭
+            }
+        }
+    }
+
+    private static async Task<CoreWebView2Environment?> GetEnvironmentAsync()
+    {
+        var endpoints = AppServices.Endpoints;
+        if (endpoints.Mode != PixivConnectionMode.DomainFronting || endpoints.HostMap.Count == 0)
+        {
+            return _environment;
+        }
+
+        // 系统已经配了代理（Clash/V2Ray 等）时优先用它，不然强制直连反而更差
+        if (_environment is null && IsSystemProxyEnabled())
+        {
+            PixivDiagnostics.Write("login: 检测到系统代理，WebView2 直接使用系统代理");
+            return null;
+        }
+
+        var key = $"fronting:{string.Join(';', endpoints.HostMap.Select(pair => $"{pair.Key}={string.Join(',', pair.Value)}"))}";
+
+        if (_environment is not null)
+        {
+            if (_environmentProxy is not null)
+            {
+                _environmentProxy.IsEnabled = true;
+            }
+
+            if (_environmentKey != key)
+            {
+                PixivDiagnostics.Write("login: 域前置 IP 已改动，WebView2 环境仍沿用本次运行的旧配置");
+            }
+
+            return _environment;
+        }
+
+        try
+        {
+            _environmentProxy = FrontingProxyServer.Start(endpoints);
+
+            var options = new CoreWebView2EnvironmentOptions
+            {
+                // --disable-quic：QUIC 走 UDP，不经过 HTTP 代理
+                AdditionalBrowserArguments = $"--proxy-server=http://127.0.0.1:{_environmentProxy.Port} --disable-quic",
+            };
+
+            _environment = await CoreWebView2Environment.CreateWithOptionsAsync(null, null, options);
+            _environmentKey = key;
+
+            PixivDiagnostics.Write($"login: 已启动本地分片代理 127.0.0.1:{_environmentProxy.Port}");
+            return _environment;
+        }
+        catch (Exception ex)
+        {
+            PixivDiagnostics.Write($"login proxy/environment failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static bool IsSystemProxyEnabled()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Internet Settings");
+
+            return key?.GetValue("ProxyEnable") is int enabled && enabled != 0;
         }
         catch (Exception)
         {
-            // 窗口已关闭
+            return false;
         }
     }
 
@@ -124,6 +233,18 @@ public sealed partial class LoginWindow : Window
         }
 
         _webClosed = true;
+
+        try
+        {
+            if (_environmentProxy is not null)
+            {
+                _environmentProxy.IsEnabled = false;
+            }
+        }
+        catch (Exception)
+        {
+            // 忽略
+        }
 
         try
         {
@@ -246,8 +367,10 @@ public sealed partial class LoginWindow : Window
                 ["redirect_uri"] = RedirectUri,
             });
 
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{ProxyBase}/api/auth/token") { Content = form };
+            var endpoints = AppServices.Endpoints;
+
+            using var http = PixivHttp.Create(endpoints, TimeSpan.FromSeconds(40));
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoints.AuthTokenUrl) { Content = form };
             request.Headers.TryAddWithoutValidation("User-Agent", "PixivAndroidApp/5.0.234 (Android 11; Pixel 5)");
 
             using var response = await http.SendAsync(request);

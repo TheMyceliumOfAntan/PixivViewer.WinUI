@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Navigation;
 using Pixiv_Viewer_WinUI.Controls;
 using Pixiv_Viewer_WinUI.Helpers;
 using Pixiv_Viewer_WinUI.Services;
+using Pixiv_Viewer_WinUI.Services.Pixiv;
 using Windows.System;
 
 namespace Pixiv_Viewer_WinUI.Views;
@@ -14,6 +15,8 @@ public sealed partial class SettingsPage : Page
     private const string RepoUrl = "https://github.com/TheMyceliumOfAntan/PixivViewer.WinUI";
 
     private const string UpstreamRepoUrl = "https://github.com/TheMyceliumOfAntan/pixiv-proxy-api";
+
+    private const string PixevalUrl = "https://github.com/Pixeval/Pixeval";
 
     private bool _initializing = true;
     private bool _loginInProgress;
@@ -29,6 +32,10 @@ public sealed partial class SettingsPage : Page
         AiSwitch.IsOn = AppServices.Settings.ShowAi;
         BlockedTagsBox.Text = AppServices.Settings.BlockedTags;
         ApiBaseUrlBox.Text = AppServices.Settings.ApiBaseUrl;
+        ModeRadio.SelectedIndex = AppServices.Settings.ApiMode == PixivConnectionMode.DomainFronting ? 1 : 0;
+        HostMapBox.Text = AppServices.Settings.FrontingHostMap;
+        FallbackSwitch.IsOn = AppServices.Settings.AutoFallback;
+        UpdateModePanels();
         DownloadFolderBox.Text = AppServices.Settings.DownloadFolder;
         ConcurrencyBox.Value = AppServices.Settings.DownloadConcurrency;
         VersionText.Text = $"v{typeof(App).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
@@ -219,19 +226,76 @@ public sealed partial class SettingsPage : Page
     private async void OnOpenRepoClick(object sender, RoutedEventArgs e)
         => await OpenUrlAsync(RepoUrl);
 
-    /// <summary>保存 API 服务地址并立即生效。</summary>
-    private void OnSaveApiBaseUrlClick(object sender, RoutedEventArgs e)
+    private async void OnOpenPixevalClick(object sender, RoutedEventArgs e)
+        => await OpenUrlAsync(PixevalUrl);
+
+    private void OnApiModeChanged(object sender, SelectionChangedEventArgs e)
     {
+        UpdateModePanels();
+
+        if (_initializing)
+        {
+            return;
+        }
+
+        ShowHint(ModeRadio.SelectedIndex == 1
+            ? "已选择域前置直连，点「保存接口设置」后生效"
+            : "已选择自建 API 反代，点「保存接口设置」后生效");
+    }
+
+    private void UpdateModePanels()
+    {
+        var fronting = ModeRadio.SelectedIndex == 1;
+
+        ProxyPanel.Visibility = fronting ? Visibility.Collapsed : Visibility.Visible;
+        FrontingPanel.Visibility = fronting ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnFallbackToggled(object sender, RoutedEventArgs e)
+    {
+        if (_initializing)
+        {
+            return;
+        }
+
+        ShowHint(FallbackSwitch.IsOn
+            ? "反代失败时会自动切到域前置（点保存后生效）"
+            : "已关闭自动兜底（点保存后生效）");
+    }
+
+    private void OnResetHostMapClick(object sender, RoutedEventArgs e)
+    {
+        HostMapBox.Text = PixivEndpoints.DefaultHostMap;
+        ShowHint("已恢复默认 IP，记得点「保存接口设置」");
+    }
+
+    /// <summary>保存接口方式 / 地址 / IP 映射并立即生效。</summary>
+    private void OnSaveApiSettingsClick(object sender, RoutedEventArgs e)
+    {
+        var mode = ModeRadio.SelectedIndex == 1
+            ? PixivConnectionMode.DomainFronting
+            : PixivConnectionMode.ReverseProxy;
+
         var url = AppSettings.NormalizeBaseUrl(ApiBaseUrlBox.Text);
         ApiBaseUrlBox.Text = url;
 
-        AppServices.Settings.ApiBaseUrl = url;
+        AppServices.Settings.UpdateApiSettings(mode, url, HostMapBox.Text.Trim(), FallbackSwitch.IsOn);
+
         AppServices.ReloadApi();
         UpdateAccountUi();
 
-        ShowHint(url.Length == 0
-            ? "服务地址为空，填写后才能真正加载内容"
-            : "已保存，正在使用该地址");
+        if (mode == PixivConnectionMode.DomainFronting)
+        {
+            ShowHint("已切换到域前置直连，图片与新请求会立刻使用该方式");
+        }
+        else if (url.Length == 0 && !FallbackSwitch.IsOn)
+        {
+            ShowHint("反代地址为空且未开启自动兜底，将无法加载内容", "配置不完整", InfoBarSeverity.Warning);
+        }
+        else
+        {
+            ShowHint("已保存，正在使用自建 API 反代");
+        }
     }
 
     /// <summary>「关于 → 更新日志」：弹出对话框显示各版本更新内容。</summary>

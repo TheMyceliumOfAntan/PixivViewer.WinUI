@@ -13,9 +13,23 @@ public static class Changelog
     {
         new()
         {
-            Version = "1.0.3",
+            Version = "1.1.0",
             Date = "2026-11-02",
             IsLatest = true,
+            Items = new[]
+            {
+                "新增域前置直连：不依赖任何服务器，把 Pixiv 域名直接连到固定 IP（TLS 仍按原域名握手）",
+                "反代失败自动兜底：连不上 / 超时 / 5xx 时自动切到域前置重试，本次运行内保持",
+                "设置 → 服务地址：可选「自建 API 反代」或「域前置直连」，IP 映射可编辑并持久化，支持一键恢复默认",
+                "域前置下图片直连 i.pximg.net（自动补 Referer），缩略图与原图下载同样走直连",
+                "网页登录支持域前置：本地 CONNECT 隧道只分片 ClientHello，不终止 TLS（检测到系统代理时自动改走系统代理）",
+                "关于页新增 Pixeval 致谢；默认 IP 与实现思路参考自开源项目 Pixeval（GPL-3.0）",
+            },
+        },
+        new()
+        {
+            Version = "1.0.3",
+            Date = "2026-11-02",
             Items = new[]
             {
                 "筛选弹窗：标签输入框支持中英日候选，和搜索页同一套补全",

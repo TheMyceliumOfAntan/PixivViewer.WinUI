@@ -15,17 +15,19 @@ using Pixiv_Viewer_WinUI.Models;
 namespace Pixiv_Viewer_WinUI.Services.Pixiv;
 
 /// <summary>
-/// 真实 Pixiv App API 实现：走自建反代 <c>https://pixiv.junsi233.top</c>（API / 图片 / OAuth 三通道）。
+/// 真实 Pixiv App API 实现：接口方式由 <see cref="PixivEndpoints"/> 决定
+/// （自建反代 / 域前置直连），反代失败时可自动切换到直连。
 /// token 与登录态由 <see cref="PixivSession"/> 管理，界面层不需要关心。
 /// </summary>
 public sealed class PixivApiService : IPixivService
 {
-    public const string DefaultBaseUrl = "";
-
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    private readonly HttpClient _http;
+    private HttpClient _http;
     private readonly PixivSession _session;
+    private readonly PixivEndpoints? _fallbackEndpoints;
+    private readonly HttpClient? _fallbackHttp;
+    private PixivEndpoints _endpoints;
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
 
     /// <summary>标签候选缓存：同一个输入 10 分钟内只打一次接口。</summary>
@@ -35,12 +37,21 @@ public sealed class PixivApiService : IPixivService
 
     private sealed record CacheEntry(object Value, DateTimeOffset ExpiresAt);
 
-    public PixivApiService(string? baseUrl = null)
+    public PixivApiService(PixivEndpoints endpoints, PixivEndpoints? fallback = null)
     {
-        var url = (baseUrl ?? DefaultBaseUrl).TrimEnd('/');
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
-        _session = new PixivSession(_http, url);
+        _endpoints = endpoints;
+        _fallbackEndpoints = fallback;
+
+        _http = PixivHttp.Create(endpoints, TimeSpan.FromSeconds(40));
+        _fallbackHttp = fallback is null ? null : PixivHttp.Create(fallback, TimeSpan.FromSeconds(40));
+
+        _session = new PixivSession(_http, endpoints);
     }
+
+    /// <summary>从反代切到域前置时触发（图片、下载用的 HttpClient 需要跟着换）。</summary>
+    public event EventHandler<PixivEndpoints>? EndpointsChanged;
+
+    public PixivEndpoints Endpoints => _endpoints;
 
     /// <summary>是否在列表中保留 R-18 作品。</summary>
     public bool ShowR18 { get; set; }
@@ -64,7 +75,7 @@ public sealed class PixivApiService : IPixivService
 
     private string _blockedTags = string.Empty;
 
-    public string BaseUrl => _session.BaseUrl;
+    public string BaseUrl => _endpoints.ApiBase;
 
     public bool IsLoggedIn => _session.IsAuthenticated;
 
@@ -359,7 +370,7 @@ public sealed class PixivApiService : IPixivService
             for (var page = 0; page < maxPages; page++)
             {
                 var offset = page * pageSize;
-                var url = $"{_session.BaseUrl}/api/web/ajax/street/comments/roots" +
+                var url = "/ajax/street/comments/roots" +
                           $"?id={Uri.EscapeDataString(id)}&type=illust&offset={offset}&limit={pageSize}";
 
                 using var response = await SendWebAsync(url, cancellationToken);
@@ -503,7 +514,7 @@ public sealed class PixivApiService : IPixivService
             return null;
         }
 
-        var url = $"{_session.BaseUrl}/api/web/collections/{collectionId}";
+        var url = $"/collections/{collectionId}";
         using var response = await SendWebAsync(url, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -616,7 +627,7 @@ public sealed class PixivApiService : IPixivService
     {
         try
         {
-            var url = $"{_session.BaseUrl}/api/web/ajax/search/tags/{Uri.EscapeDataString(word)}?lang={lang}";
+            var url = $"{_endpoints.WebBase}/ajax/search/tags/{Uri.EscapeDataString(word)}?lang={lang}";
 
             // 这个端点不需要登录；有趣的是带上登录 cookie 时 pixiv 只返回 1 个候选，
             // 匿名反而给完整的相关标签 + 中英译名，所以这里刻意不带 cookie。
@@ -837,26 +848,82 @@ public sealed class PixivApiService : IPixivService
 
     private void EnsureConfigured()
     {
-        if (string.IsNullOrWhiteSpace(_session.BaseUrl))
+        if (!_endpoints.IsUsable)
         {
             throw new PixivNotConfiguredException();
         }
     }
 
-    private async Task<HttpResponseMessage> SendWebAsync(string url, CancellationToken cancellationToken)
+    /// <summary>反代请求失败（连不上 / 超时 / 5xx）时永久切到域前置，只切一次。</summary>
+    private bool TrySwitchToFallback()
+    {
+        if (_fallbackEndpoints is null ||
+            _fallbackHttp is null ||
+            _endpoints.Mode != PixivConnectionMode.ReverseProxy)
+        {
+            return false;
+        }
+
+        _endpoints = _fallbackEndpoints;
+        _http = _fallbackHttp;
+        _session.SwitchEndpoints(_http, _endpoints);
+        _cache.Clear();
+
+        PixivDiagnostics.Write("api: 反代不可用，已切换到域前置直连");
+        EndpointsChanged?.Invoke(this, _endpoints);
+        return true;
+    }
+
+    private static bool IsTransient(Exception ex, CancellationToken cancellationToken)
+        => !cancellationToken.IsCancellationRequested &&
+           (ex is HttpRequestException or TaskCanceledException or System.IO.IOException);
+
+    private async Task<HttpResponseMessage> SendWebAsync(string pathAndQuery, CancellationToken cancellationToken)
     {
         EnsureConfigured();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.TryAddWithoutValidation("User-Agent", PixivSession.UserAgent);
-
-        // 反代会把 X-Pixiv-Cookie 转成 Cookie 发给 www.pixiv.net
-        if (!string.IsNullOrWhiteSpace(_session.SessionCookie))
+        while (true)
         {
-            request.Headers.TryAddWithoutValidation("X-Pixiv-Cookie", _session.SessionCookie);
-        }
+            var url = _endpoints.WebBase + pathAndQuery;
 
-        return await _http.SendAsync(request, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.TryAddWithoutValidation("User-Agent", PixivSession.UserAgent);
+
+            // 反代会把 X-Pixiv-Cookie 转成 Cookie 发给 www.pixiv.net；直连必须用标准 Cookie
+            if (!string.IsNullOrWhiteSpace(_session.SessionCookie))
+            {
+                request.Headers.TryAddWithoutValidation(_endpoints.CookieHeaderName, _session.SessionCookie);
+            }
+
+            if (!_endpoints.UsesReverseProxy)
+            {
+                request.Headers.TryAddWithoutValidation("Referer", "https://www.pixiv.net/");
+            }
+
+            HttpResponseMessage response;
+
+            try
+            {
+                response = await _http.SendAsync(request, cancellationToken);
+            }
+            catch (Exception ex) when (IsTransient(ex, cancellationToken))
+            {
+                if (TrySwitchToFallback())
+                {
+                    continue;
+                }
+
+                throw;
+            }
+
+            if ((int)response.StatusCode >= 500 && TrySwitchToFallback())
+            {
+                response.Dispose();
+                continue;
+            }
+
+            return response;
+        }
     }
 
     // ---------------------------------------------------------------- 写操作
@@ -905,7 +972,7 @@ public sealed class PixivApiService : IPixivService
         {
             using var request = new HttpRequestMessage(
                 HttpMethod.Post,
-                $"{_session.BaseUrl}/api/web/rpc/post_comment.php")
+                $"{_endpoints.WebBase}/rpc/post_comment.php")
             {
                 Content = new FormUrlEncodedContent(new Dictionary<string, string>
                 {
@@ -917,8 +984,10 @@ public sealed class PixivApiService : IPixivService
             };
 
             request.Headers.TryAddWithoutValidation("User-Agent", PixivSession.UserAgent);
-            request.Headers.TryAddWithoutValidation("X-Pixiv-Cookie", _session.SessionCookie);
-            request.Headers.TryAddWithoutValidation("X-Pixiv-Referer", $"https://www.pixiv.net/artworks/{id}");
+            request.Headers.TryAddWithoutValidation(_endpoints.CookieHeaderName, _session.SessionCookie);
+            request.Headers.TryAddWithoutValidation(
+                _endpoints.UsesReverseProxy ? "X-Pixiv-Referer" : "Referer",
+                $"https://www.pixiv.net/artworks/{id}");
 
             using var response = await _http.SendAsync(request, cancellationToken);
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -954,15 +1023,15 @@ public sealed class PixivApiService : IPixivService
     private async Task<T?> GetJsonAsync<T>(string path, Dictionary<string, string>? query, CancellationToken cancellationToken)
         where T : class
     {
-        var url = BuildUrl(path, query);
+        var pathAndQuery = BuildPath(path, query);
 
         // 命中缓存直接返回：反代有风控风险，同样的请求 3 分钟内只打一次（详情 10 分钟）。
-        if (_cache.TryGetValue(url, out var hit) && hit.ExpiresAt > DateTimeOffset.Now && hit.Value is T cached)
+        if (_cache.TryGetValue(pathAndQuery, out var hit) && hit.ExpiresAt > DateTimeOffset.Now && hit.Value is T cached)
         {
             return cached;
         }
 
-        using var response = await SendAsync(HttpMethod.Get, url, null, cancellationToken);
+        using var response = await SendAsync(HttpMethod.Get, pathAndQuery, null, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -991,7 +1060,7 @@ public sealed class PixivApiService : IPixivService
             var ttl = path.Contains("/illust/detail", StringComparison.Ordinal)
                 ? TimeSpan.FromMinutes(10)
                 : TimeSpan.FromMinutes(3);
-            StoreCache(url, result, ttl);
+            StoreCache(pathAndQuery, result, ttl);
         }
 
         return result;
@@ -1017,10 +1086,10 @@ public sealed class PixivApiService : IPixivService
 
     private async Task<bool> PostFormAsync(string path, Dictionary<string, string> fields, CancellationToken cancellationToken)
     {
-        var url = BuildUrl(path, null);
+        var pathAndQuery = BuildPath(path, null);
         using var response = await SendAsync(
             HttpMethod.Post,
-            url,
+            pathAndQuery,
             () => new FormUrlEncodedContent(fields),
             cancellationToken);
 
@@ -1030,10 +1099,10 @@ public sealed class PixivApiService : IPixivService
     private async Task<T?> PostJsonAsync<T>(string path, Dictionary<string, string> fields, CancellationToken cancellationToken)
         where T : class
     {
-        var url = BuildUrl(path, null);
+        var pathAndQuery = BuildPath(path, null);
         using var response = await SendAsync(
             HttpMethod.Post,
-            url,
+            pathAndQuery,
             () => new FormUrlEncodedContent(fields),
             cancellationToken);
 
@@ -1048,17 +1117,27 @@ public sealed class PixivApiService : IPixivService
 
     private async Task<HttpResponseMessage> SendAsync(
         HttpMethod method,
-        string url,
+        string pathAndQuery,
         Func<HttpContent>? contentFactory,
         CancellationToken cancellationToken)
     {
-        for (var attempt = 0; ; attempt++)
+        var authRetried = false;
+
+        while (true)
         {
             EnsureConfigured();
 
             var token = await _session.GetAccessTokenAsync(cancellationToken);
 
-            using var request = new HttpRequestMessage(method, url);
+            // 反代连不上导致 token 也刷新不了：先切域前置再重试，避免第一次请求必然失败
+            if (token is null &&
+                _session.LastRefreshFailedWithNetworkError &&
+                TrySwitchToFallback())
+            {
+                continue;
+            }
+
+            using var request = new HttpRequestMessage(method, _endpoints.ApiBase + pathAndQuery);
             request.Headers.TryAddWithoutValidation("User-Agent", PixivSession.UserAgent);
             request.Headers.TryAddWithoutValidation("Accept-Language", "zh-CN,zh;q=0.9,ja;q=0.8");
             if (!string.IsNullOrEmpty(token))
@@ -1071,13 +1150,36 @@ public sealed class PixivApiService : IPixivService
                 request.Content = contentFactory();
             }
 
-            var response = await _http.SendAsync(request, cancellationToken);
+            HttpResponseMessage response;
+
+            try
+            {
+                response = await _http.SendAsync(request, cancellationToken);
+            }
+            catch (Exception ex) when (IsTransient(ex, cancellationToken))
+            {
+                // 反代连不上 / 超时：切域前置重试
+                if (TrySwitchToFallback())
+                {
+                    continue;
+                }
+
+                throw;
+            }
 
             // access_token 失效：刷新后重试一次
-            if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0)
+            if (!authRetried && response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 response.Dispose();
                 _session.InvalidateAccessToken();
+                authRetried = true;
+                continue;
+            }
+
+            // 反代 5xx：切域前置重试
+            if ((int)response.StatusCode >= 500 && TrySwitchToFallback())
+            {
+                response.Dispose();
                 continue;
             }
 
@@ -1085,9 +1187,9 @@ public sealed class PixivApiService : IPixivService
         }
     }
 
-    private string BuildUrl(string path, Dictionary<string, string>? query)
+    private static string BuildPath(string path, Dictionary<string, string>? query)
     {
-        var builder = new StringBuilder(_session.BaseUrl).Append("/api").Append(path);
+        var builder = new StringBuilder(path);
 
         if (query is null || query.Count == 0)
         {
@@ -1347,12 +1449,15 @@ public sealed class PixivApiService : IPixivService
             return string.Empty;
         }
 
-        return url.Replace("https://i.pximg.net", _session.BaseUrl + "/image", StringComparison.OrdinalIgnoreCase);
+        return url.Replace(
+            "https://i.pximg.net",
+            _endpoints.ImageBase.TrimEnd('/'),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>s.pximg.net 的静态资源（评论印章/表情）统一走反代的 /static/ 前缀。</summary>
     private string ProxyStatic(string path)
-        => $"{_session.BaseUrl}/static/{path.TrimStart('/')}";
+        => $"{_endpoints.StaticBase.TrimEnd('/')}/{path.TrimStart('/')}";
 
     private static DateTimeOffset ParseDate(string? value)
         => DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)

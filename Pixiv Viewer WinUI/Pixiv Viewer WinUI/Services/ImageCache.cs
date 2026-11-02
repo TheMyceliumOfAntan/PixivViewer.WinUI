@@ -17,7 +17,8 @@ namespace Pixiv_Viewer_WinUI.Services;
 /// </summary>
 public static class ImageCache
 {
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(45) };
+    /// <summary>图片下载客户端，由 <see cref="AppServices"/> 按当前接口方式注入。</summary>
+    public static HttpClient Client { get; set; } = new() { Timeout = TimeSpan.FromSeconds(45) };
 
     private static readonly Dictionary<string, BitmapImage> Memory = new();
     private static readonly Dictionary<string, Task<BitmapImage?>> Pending = new();
@@ -114,7 +115,7 @@ public static class ImageCache
                 if (attempt > 0 || !File.Exists(file) || new FileInfo(file).Length == 0)
                 {
                     Directory.CreateDirectory(Root);
-                    var bytes = await Http.GetByteArrayAsync(url);
+                    var bytes = await Client.GetByteArrayAsync(url);
                     await File.WriteAllBytesAsync(file, bytes);
                 }
 

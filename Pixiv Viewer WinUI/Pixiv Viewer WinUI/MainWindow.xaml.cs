@@ -74,8 +74,8 @@ public sealed partial class MainWindow : Window
 
             try
             {
-                // 首次运行 / 没填 API 地址：直接进设置页，避免一进来全是加载失败
-                if (string.IsNullOrWhiteSpace(AppServices.Settings.ApiBaseUrl))
+                // 首次运行 / 两种方式都没配置：直接进设置页，避免一进来全是加载失败
+                if (!AppServices.Settings.IsApiConfigured)
                 {
                     ContentFrame.Navigate(typeof(SettingsPage));
                 }

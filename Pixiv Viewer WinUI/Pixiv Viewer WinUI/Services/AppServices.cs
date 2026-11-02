@@ -1,4 +1,5 @@
 using System;
+using System.Net.Http;
 using Microsoft.UI.Xaml;
 using Pixiv_Viewer_WinUI.Helpers;
 using Pixiv_Viewer_WinUI.Services.Pixiv;
@@ -16,19 +17,56 @@ public static class AppServices
 
     public static IPixivService Pixiv => PixivApi;
 
-    public static IDownloadService Downloads { get; } = new DownloadService();
+    public static DownloadService Downloads { get; private set; } = new();
+
+    /// <summary>图片下载专用 HttpClient（域前置模式下走固定 IP + Referer）。</summary>
+    public static HttpClient Images { get; private set; } = null!;
+
+    public static PixivEndpoints Endpoints => PixivApi.Endpoints;
 
     static AppServices()
     {
-        PixivApi = new PixivApiService(Settings.ApiBaseUrl);
-        ApplyApiSettings();
+        ReloadApi();
     }
 
-    /// <summary>设置里改了 API 地址后重建服务（会重新读取本机保存的登录态）。</summary>
+    /// <summary>设置里改了接口方式 / 地址 / IP 后重建服务（会重新读取本机保存的登录态）。</summary>
     public static void ReloadApi()
     {
-        PixivApi = new PixivApiService(Settings.ApiBaseUrl);
+        var primary = BuildPrimaryEndpoints();
+        var fallback = primary.Mode == PixivConnectionMode.ReverseProxy && Settings.AutoFallback
+            ? PixivEndpoints.DomainFronting(Settings.FrontingHostMap)
+            : null;
+
+        PixivApi = new PixivApiService(primary, fallback);
+        PixivApi.EndpointsChanged += (_, endpoints) => ApplyImageClient(endpoints);
+
         ApplyApiSettings();
+        ApplyImageClient(primary);
+    }
+
+    private static PixivEndpoints BuildPrimaryEndpoints()
+    {
+        if (Settings.ApiMode == PixivConnectionMode.DomainFronting)
+        {
+            return PixivEndpoints.DomainFronting(Settings.FrontingHostMap);
+        }
+
+        // 没填反代地址又允许兜底：直接走域前置，避免一启动就什么都加载不出来
+        if (string.IsNullOrEmpty(Settings.ApiBaseUrl) && Settings.AutoFallback)
+        {
+            return PixivEndpoints.DomainFronting(Settings.FrontingHostMap);
+        }
+
+        return PixivEndpoints.ReverseProxy(Settings.ApiBaseUrl);
+    }
+
+    private static void ApplyImageClient(PixivEndpoints endpoints)
+    {
+        var client = PixivHttp.Create(endpoints, TimeSpan.FromSeconds(45));
+
+        Images = client;
+        ImageCache.Client = client;
+        Downloads.SetHttpClient(client);
     }
 
     private static void ApplyApiSettings()
@@ -50,7 +88,25 @@ public sealed class AppSettings : ObservableObject
     private int _downloadConcurrency = 3;
     private string _blockedTags = string.Empty;
     private ElementTheme _theme = ElementTheme.Default;
-    private string _apiBaseUrl = SettingsStore.LoadApiBaseUrl();
+
+    private string _apiBaseUrl;
+    private PixivConnectionMode _apiMode;
+    private string _frontingHostMap;
+    private bool _autoFallback;
+
+    public AppSettings()
+    {
+        var stored = SettingsStore.Load();
+
+        _apiBaseUrl = NormalizeBaseUrl(stored.ApiBaseUrl);
+        _apiMode = string.Equals(stored.ApiMode, "fronting", StringComparison.OrdinalIgnoreCase)
+            ? PixivConnectionMode.DomainFronting
+            : PixivConnectionMode.ReverseProxy;
+        _frontingHostMap = string.IsNullOrWhiteSpace(stored.FrontingHostMap)
+            ? PixivEndpoints.DefaultHostMap
+            : stored.FrontingHostMap;
+        _autoFallback = stored.AutoFallback;
+    }
 
     /// <summary>
     /// Pixiv API 服务地址（用户自建）。软件不内置任何公共接口，
@@ -65,9 +121,88 @@ public sealed class AppSettings : ObservableObject
 
             if (SetProperty(ref _apiBaseUrl, normalized))
             {
-                SettingsStore.SaveApiBaseUrl(normalized);
+                Persist();
             }
         }
+    }
+
+    private bool _suppressApiNotifications;
+
+    /// <summary>设置页保存时批量更新，避免中途触发页面刷新（此时新端点还没生效）。</summary>
+    public void UpdateApiSettings(PixivConnectionMode mode, string url, string hostMap, bool autoFallback)
+    {
+        _suppressApiNotifications = true;
+
+        try
+        {
+            ApiMode = mode;
+            ApiBaseUrl = url;
+            FrontingHostMap = hostMap;
+            AutoFallback = autoFallback;
+        }
+        finally
+        {
+            _suppressApiNotifications = false;
+        }
+    }
+
+    /// <summary>接口方式：自建反代 / 域前置直连。</summary>
+    public PixivConnectionMode ApiMode
+    {
+        get => _apiMode;
+        set
+        {
+            if (SetProperty(ref _apiMode, value))
+            {
+                Persist();
+
+                if (!_suppressApiNotifications)
+                {
+                    PixivApiSettingsChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+        }
+    }
+
+    /// <summary>域前置的「域名 = IP」映射（多行文本）。</summary>
+    public string FrontingHostMap
+    {
+        get => _frontingHostMap;
+        set
+        {
+            if (SetProperty(ref _frontingHostMap, value ?? string.Empty))
+            {
+                Persist();
+            }
+        }
+    }
+
+    /// <summary>反代请求失败时自动切换到域前置直连。</summary>
+    public bool AutoFallback
+    {
+        get => _autoFallback;
+        set
+        {
+            if (SetProperty(ref _autoFallback, value))
+            {
+                Persist();
+            }
+        }
+    }
+
+    /// <summary>当前配置是否可用（域前置 / 已开启自动兜底时都视为可用）。</summary>
+    public bool IsApiConfigured =>
+        _apiMode == PixivConnectionMode.DomainFronting || _apiBaseUrl.Length > 0 || _autoFallback;
+
+    private void Persist()
+    {
+        SettingsStore.Save(new StoredSettings
+        {
+            ApiBaseUrl = _apiBaseUrl,
+            ApiMode = _apiMode == PixivConnectionMode.DomainFronting ? "fronting" : "proxy",
+            FrontingHostMap = _frontingHostMap,
+            AutoFallback = _autoFallback,
+        });
     }
 
     /// <summary>规范化地址：去空格、去尾部斜杠，缺协议时补 https://。</summary>
@@ -97,7 +232,7 @@ public sealed class AppSettings : ObservableObject
         {
             if (SetProperty(ref _useSampleData, value))
             {
-                SampleDataChanged?.Invoke(this, System.EventArgs.Empty);
+                SampleDataChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }
@@ -111,7 +246,7 @@ public sealed class AppSettings : ObservableObject
             if (SetProperty(ref _showR18, value))
             {
                 AppServices.PixivApi.ShowR18 = value;
-                PixivApiSettingsChanged?.Invoke(this, System.EventArgs.Empty);
+                PixivApiSettingsChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }
@@ -125,7 +260,7 @@ public sealed class AppSettings : ObservableObject
             if (SetProperty(ref _showR18G, value))
             {
                 AppServices.PixivApi.ShowR18G = value;
-                PixivApiSettingsChanged?.Invoke(this, System.EventArgs.Empty);
+                PixivApiSettingsChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }
@@ -139,7 +274,7 @@ public sealed class AppSettings : ObservableObject
             if (SetProperty(ref _showAi, value))
             {
                 AppServices.PixivApi.ShowAi = value;
-                PixivApiSettingsChanged?.Invoke(this, System.EventArgs.Empty);
+                PixivApiSettingsChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }
@@ -153,7 +288,7 @@ public sealed class AppSettings : ObservableObject
             if (SetProperty(ref _blockedTags, value))
             {
                 AppServices.PixivApi.BlockedTags = value;
-                PixivApiSettingsChanged?.Invoke(this, System.EventArgs.Empty);
+                PixivApiSettingsChanged?.Invoke(this, EventArgs.Empty);
             }
         }
     }
@@ -184,10 +319,10 @@ public sealed class AppSettings : ObservableObject
         set => SetProperty(ref _downloadConcurrency, System.Math.Clamp(value, 1, 8));
     }
 
-    public event System.EventHandler? SampleDataChanged;
+    public event EventHandler? SampleDataChanged;
 
     /// <summary>R-18 / 黑名单等过滤条件变化时触发，页面可据此刷新列表。</summary>
-    public event System.EventHandler? PixivApiSettingsChanged;
+    public event EventHandler? PixivApiSettingsChanged;
 
     public void ApplyTheme()
     {

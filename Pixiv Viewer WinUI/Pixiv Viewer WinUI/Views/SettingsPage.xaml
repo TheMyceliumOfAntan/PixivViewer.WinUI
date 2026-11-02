@@ -20,40 +20,92 @@
                 <TextBlock Style="{StaticResource PageSubtitleTextBlockStyle}" Text="外观、数据与账号" />
             </StackPanel>
 
-            <!--  API 服务地址（必须由用户自行配置）  -->
+            <!--  接口方式与地址  -->
             <TextBlock
                 Margin="0,8,0,0"
                 Style="{StaticResource SectionHeaderTextBlockStyle}"
                 Text="服务地址" />
 
             <Border Style="{StaticResource SurfaceCardStyle}">
-                <StackPanel Spacing="10">
-                    <StackPanel Spacing="2">
-                        <TextBlock FontSize="14" Text="Pixiv API 地址" />
-                        <TextBlock
-                            Style="{StaticResource MetaTextBlockStyle}"
-                            Text="本软件不提供公共接口，请填写你自建服务的地址。"
-                            TextWrapping="Wrap" />
+                <StackPanel Spacing="12">
+                    <RadioButtons
+                        x:Name="ModeRadio"
+                        SelectionChanged="OnApiModeChanged">
+                        <RadioButton Content="自建 API 反代（推荐）" Tag="proxy" />
+                        <RadioButton Content="域前置直连（无需自建服务器）" Tag="fronting" />
+                    </RadioButtons>
+
+                    <!--  自建反代  -->
+                    <StackPanel x:Name="ProxyPanel" Spacing="8">
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="Pixiv API 地址" />
+                            <TextBlock
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="本软件不提供公共接口，请填写你自建服务的地址。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <TextBox
+                            x:Name="ApiBaseUrlBox"
+                            PlaceholderText="https://your-server.example.com" />
+
+                        <HyperlinkButton
+                            Padding="0"
+                            Click="OnOpenProxyRepoClick"
+                            Content="查看 Pixiv API 项目（含一键部署）" />
                     </StackPanel>
 
-                    <Grid ColumnSpacing="8">
+                    <!--  域前置直连  -->
+                    <StackPanel x:Name="FrontingPanel" Spacing="8">
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="服务器 IP 映射" />
+                            <TextBlock
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="每行「域名 = IP, IP」。只改 DNS 解析，TLS 仍按原域名握手；留空则使用内置默认值。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <TextBox
+                            x:Name="HostMapBox"
+                            Height="170"
+                            AcceptsReturn="True"
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            TextWrapping="NoWrap"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Click="OnResetHostMapClick" Content="恢复默认 IP" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="网络环境不同，可自行替换为可用 IP" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBox
-                            x:Name="ApiBaseUrlBox"
-                            PlaceholderText="https://your-server.example.com" />
-                        <Button
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="反代失败时自动切换域前置" />
+                            <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="连不上 / 超时 / 5xx 时自动兜底，并在本次运行内保持（仅自建反代模式生效）" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="FallbackSwitch"
                             Grid.Column="1"
-                            Click="OnSaveApiBaseUrlClick"
-                            Content="保存" />
+                            VerticalAlignment="Center"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="OnFallbackToggled" />
                     </Grid>
 
-                    <HyperlinkButton
-                        Padding="0"
-                        Click="OnOpenProxyRepoClick"
-                        Content="查看 Pixiv API 项目（含一键部署）" />
+                    <Button
+                        Click="OnSaveApiSettingsClick"
+                        Content="保存接口设置"
+                        Style="{StaticResource AccentButtonStyle}" />
                 </StackPanel>
             </Border>
 
@@ -350,7 +402,7 @@
                             Grid.Column="2"
                             VerticalAlignment="Center"
                             Style="{StaticResource MetaTextBlockStyle}"
-                            Text="v1.0.3" />
+                            Text="v1.1.0" />
                     </Grid>
 
                     <Rectangle Style="{StaticResource DividerRectangleStyle}" />
@@ -396,6 +448,25 @@
                             Click="OnOpenProxyRepoClick"
                             Content="TheMyceliumOfAntan/pixiv-proxy-api" />
                     </Grid>
+
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock FontSize="14" Text="致谢 · 域前置方案参考" />
+                        <HyperlinkButton
+                            Grid.Column="1"
+                            Padding="0"
+                            VerticalAlignment="Center"
+                            Click="OnOpenPixevalClick"
+                            Content="Pixeval/Pixeval" />
+                    </Grid>
+
+                    <TextBlock
+                        Style="{StaticResource MetaTextBlockStyle}"
+                        Text="域前置直连的默认服务器 IP 与实现思路参考自开源项目 Pixeval（GPL-3.0），在此致谢。"
+                        TextWrapping="Wrap" />
 
                     <Rectangle Style="{StaticResource DividerRectangleStyle}" />
 

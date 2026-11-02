@@ -21,7 +21,7 @@ public sealed class PixivSession
 
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    private readonly HttpClient _http;
+    private HttpClient _http;
     private readonly string _tokenPath;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -30,10 +30,10 @@ public sealed class PixivSession
     private DateTimeOffset _expiresAt = DateTimeOffset.MinValue;
     private string _sessionCookie = string.Empty;
 
-    public PixivSession(HttpClient http, string baseUrl)
+    public PixivSession(HttpClient http, PixivEndpoints endpoints)
     {
         _http = http;
-        BaseUrl = baseUrl.TrimEnd('/');
+        Endpoints = endpoints;
 
         var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -73,13 +73,25 @@ public sealed class PixivSession
         SecretStore.Save(path, _sessionCookie);
     }
 
-    public string BaseUrl { get; }
+    public string BaseUrl => Endpoints.ApiBase;
+
+    public PixivEndpoints Endpoints { get; private set; }
+
+    /// <summary>反代失效切到域前置时换掉 HttpClient / 端点，已拿到的 access_token 继续复用。</summary>
+    internal void SwitchEndpoints(HttpClient http, PixivEndpoints endpoints)
+    {
+        _http = http;
+        Endpoints = endpoints;
+    }
 
     public PixivUser? User { get; private set; }
 
     public bool HasRefreshToken => !string.IsNullOrWhiteSpace(_refreshToken);
 
     public bool IsAuthenticated => User is not null;
+
+    /// <summary>上一次刷新 token 是否因为网络原因失败（反代挂了），用于自动切换域前置。</summary>
+    public bool LastRefreshFailedWithNetworkError { get; private set; }
 
     public async Task<bool> SignInAsync(CancellationToken cancellationToken = default)
     {
@@ -198,10 +210,15 @@ public sealed class PixivSession
 
         try
         {
-            return await RefreshCoreUnsafeAsync(cancellationToken);
+            var result = await RefreshCoreUnsafeAsync(cancellationToken);
+            LastRefreshFailedWithNetworkError = false;
+            return result;
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
+            LastRefreshFailedWithNetworkError =
+                ex is HttpRequestException or TaskCanceledException or System.IO.IOException;
+
             PixivDiagnostics.Write($"auth exception: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
@@ -218,7 +235,7 @@ public sealed class PixivSession
             ["refresh_token"] = _refreshToken!,
         });
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/auth/token") { Content = form };
+        using var request = new HttpRequestMessage(HttpMethod.Post, Endpoints.AuthTokenUrl) { Content = form };
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
 
         using var response = await _http.SendAsync(request, cancellationToken);

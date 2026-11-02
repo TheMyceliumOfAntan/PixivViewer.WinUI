@@ -64,6 +64,8 @@
 
 ### 其它
 
+- **连接方式双通道**：自建 API 反代优先，反代不可用时自动切「域前置直连」，不需要任何服务器
+- 域前置直连：把 Pixiv 域名解析到固定 IP，TLS 仍按原域名握手（SNI / 证书校验不变），IP 可在设置里改
 - 主题：跟随系统 / 浅色 / 深色
 - 黑名单标签过滤
 - 缓存占用查看与一键清理
@@ -75,14 +77,16 @@
 
 从 [Releases](https://github.com/TheMyceliumOfAntan/PixivViewer.WinUI/releases) 下载 `PixivViewer-Setup-<版本>-x64.exe`，双击安装。
 
-> **⚠️ 使用前需要自备接口**
-> 本软件不内置任何公共 API 服务，首次启动会让你填写自己的服务地址。
-> 服务端代码与一键部署入口在 [TheMyceliumOfAntan/pixiv-proxy-api](https://github.com/TheMyceliumOfAntan/pixiv-proxy-api)。
+> **两种接口方式，任选其一**
+> - **域前置直连（默认，免服务器）**：程序内置 Pixiv 官方域名的可用 IP，开箱即用；IP 失效时可在「设置 → 服务地址」里改。
+> - **自建 API 反代**：填自己的服务地址，速度更稳；服务端代码与一键部署入口在 [TheMyceliumOfAntan/pixiv-proxy-api](https://github.com/TheMyceliumOfAntan/pixiv-proxy-api)。
+>
+> 两者可同时启用：反代连不上 / 超时 / 5xx 时会自动切换到域前置。
 
 首次启动流程：
 
 1. 打开程序会自动进入「设置 → 服务地址」
-2. 填入你自己的 API 地址（例如 `https://your-api.example.com`），点「保存」
+2. 选择「域前置直连」直接保存即可；或选「自建 API 反代」并填入地址（例如 `https://your-api.example.com`）
 3. 到「设置 → 账号」登录，之后就能正常使用了
 
 - 已装旧版本时**直接装新版即可覆盖升级**，不需要先卸载
@@ -104,7 +108,16 @@
 ## 常见问题
 
 **打开后一直提示「还没有配置 Pixiv API 地址」？**
-到「设置 → 服务地址」填写你自建服务的地址并保存。服务端：https://github.com/TheMyceliumOfAntan/pixiv-proxy-api
+到「设置 → 服务地址」选「域前置直连」，或填写你自建服务的地址并保存。服务端：https://github.com/TheMyceliumOfAntan/pixiv-proxy-api
+
+**域前置直连也加载不出来？**
+说明内置 IP 当前不可用。到「设置 → 服务地址」把对应域名换成你能连通的 IP（格式 `域名 = IP`），或改用自建反代。
+
+**自建反代挂了会怎样？**
+只要开启「反代失败时自动切换域前置」，连接失败 / 超时 / 5xx 时会自动改走直连，本次运行内不再反复重试坏掉的反代。
+
+**域前置模式下网页登录显示 403 Forbidden？**
+Pixiv 会按出口 IP 拒绝部分网络的网页请求（App API 和图片不受影响）。这种情况请先打开系统代理 / VPN 再登录，程序检测到系统代理时会自动改用它。
 
 **提示「未登录或登录已过期」？**
 到「设置 → 账号」重新网页登录一次即可，登录状态平时会自动续期。
@@ -134,6 +147,7 @@ Pixiv 会阶段性限制评论接口，程序会自动重试备用的读取方�
 ## 致谢
 
 - [TheMyceliumOfAntan/pixiv-proxy-api](https://github.com/TheMyceliumOfAntan/pixiv-proxy-api) —— 本项目使用的 Pixiv API 服务
+- [Pixeval/Pixeval](https://github.com/Pixeval/Pixeval)（GPL-3.0）—— 域前置直连的默认服务器 IP 与实现思路参考
 - [bilibili/Index-Translate](https://github.com/bilibili/Index-Translate) —— 免费翻译接口
 - [upbit/pixivpy](https://github.com/upbit/pixivpy) —— App API 端点参考
 

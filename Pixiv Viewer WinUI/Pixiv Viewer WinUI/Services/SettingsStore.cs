@@ -4,38 +4,57 @@ using System.Text.Json;
 
 namespace Pixiv_Viewer_WinUI.Services;
 
+/// <summary>settings.json 的落盘结构。新增字段给默认值，旧版本文件读不出也不会炸。</summary>
+internal sealed class StoredSettings
+{
+    public string ApiBaseUrl { get; set; } = string.Empty;
+
+    /// <summary>proxy = 自建反代；fronting = 域前置直连。</summary>
+    public string ApiMode { get; set; } = "proxy";
+
+    /// <summary>「域名 = IP, IP」多行文本；空则用内置默认。</summary>
+    public string FrontingHostMap { get; set; } = string.Empty;
+
+    /// <summary>反代失败时自动切域前置。</summary>
+    public bool AutoFallback { get; set; } = true;
+}
+
 /// <summary>
 /// 极简本地设置存储（%LOCALAPPDATA%\PixivViewer\settings.json）。
-/// 目前只持久化「API 服务地址」——它是程序能否工作的前提，必须记住。
 /// </summary>
 internal static class SettingsStore
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+    };
+
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "PixivViewer",
         "settings.json");
 
-    public static string LoadApiBaseUrl()
+    public static StoredSettings Load()
     {
         try
         {
             if (!File.Exists(FilePath))
             {
-                return string.Empty;
+                return new StoredSettings();
             }
 
-            using var document = JsonDocument.Parse(File.ReadAllText(FilePath));
-            return document.RootElement.TryGetProperty("apiBaseUrl", out var value)
-                ? (value.GetString() ?? string.Empty).Trim()
-                : string.Empty;
+            return JsonSerializer.Deserialize<StoredSettings>(File.ReadAllText(FilePath), JsonOptions)
+                   ?? new StoredSettings();
         }
         catch (Exception)
         {
-            return string.Empty;
+            return new StoredSettings();
         }
     }
 
-    public static void SaveApiBaseUrl(string value)
+    public static void Save(StoredSettings settings)
     {
         try
         {
@@ -45,8 +64,7 @@ internal static class SettingsStore
                 Directory.CreateDirectory(directory);
             }
 
-            var json = JsonSerializer.Serialize(new { apiBaseUrl = value ?? string.Empty });
-            File.WriteAllText(FilePath, json);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, JsonOptions));
         }
         catch (Exception)
         {

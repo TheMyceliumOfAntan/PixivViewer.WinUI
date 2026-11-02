@@ -20,9 +20,12 @@ public sealed class DownloadService : IDownloadService
 {
     private static readonly string[] ImageExtensions = { ".jpg", ".png", ".webp", ".gif" };
 
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromMinutes(5) };
+    private HttpClient _http = new() { Timeout = TimeSpan.FromMinutes(5) };
     private readonly List<DownloadTask> _tasks = new();
     private readonly object _taskGate = new();
+
+    /// <summary>换用 Domain Fronting 时由 <see cref="AppServices"/> 替换。</summary>
+    public void SetHttpClient(HttpClient client) => _http = client;
 
     private static readonly string TaskFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
