@@ -17,6 +17,15 @@ internal sealed class StoredSettings
 
     /// <summary>反代失败时自动切域前置。</summary>
     public bool AutoFallback { get; set; } = true;
+
+    /// <summary>启动时自动检查更新。</summary>
+    public bool AutoCheckUpdate { get; set; } = true;
+
+    /// <summary>用户选择「跳过此版本」的版本号（如 1.1.1）。</summary>
+    public string SkippedUpdateVersion { get; set; } = string.Empty;
+
+    /// <summary>上次检查更新的时间（ISO 8601），用于「每天最多查一次」。</summary>
+    public string LastUpdateCheckUtc { get; set; } = string.Empty;
 }
 
 /// <summary>

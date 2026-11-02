@@ -35,6 +35,7 @@ public sealed partial class SettingsPage : Page
         ModeRadio.SelectedIndex = AppServices.Settings.ApiMode == PixivConnectionMode.DomainFronting ? 1 : 0;
         HostMapBox.Text = AppServices.Settings.FrontingHostMap;
         FallbackSwitch.IsOn = AppServices.Settings.AutoFallback;
+        UpdateSwitch.IsOn = AppServices.Settings.AutoCheckUpdate;
         UpdateModePanels();
         DownloadFolderBox.Text = AppServices.Settings.DownloadFolder;
         ConcurrencyBox.Value = AppServices.Settings.DownloadConcurrency;
@@ -311,6 +312,54 @@ public sealed partial class SettingsPage : Page
         {
             // 快速连点导致重复 ShowAsync 时忽略
             ShowHint($"更新日志打开失败：{ex.Message}");
+        }
+    }
+
+    private void OnAutoCheckUpdateToggled(object sender, RoutedEventArgs e)
+    {
+        if (_initializing)
+        {
+            return;
+        }
+
+        AppServices.Settings.AutoCheckUpdate = UpdateSwitch.IsOn;
+        ShowHint(UpdateSwitch.IsOn ? "已开启启动时检查更新" : "已关闭启动时检查更新（仍可手动检查）");
+    }
+
+    private async void OnCheckUpdateClick(object sender, RoutedEventArgs e)
+    {
+        CheckUpdateButton.IsEnabled = false;
+        UpdateStatusText.Text = "正在检查…";
+
+        try
+        {
+            var (hasUpdate, error) = await UpdateCoordinator.CheckManuallyAsync(XamlRoot);
+
+            if (hasUpdate)
+            {
+                UpdateStatusText.Text = "发现新版本";
+                ShowHint("发现新版本，已在弹窗中显示更新说明", "检查更新");
+            }
+            else if (!string.IsNullOrWhiteSpace(error))
+            {
+                UpdateStatusText.Text = "检查失败";
+                ShowHint($"检查更新失败：{error}", "检查更新", InfoBarSeverity.Warning);
+            }
+            else
+            {
+                var current = UpdateService.CurrentVersion;
+                UpdateStatusText.Text = $"已是最新版本（v{current}）";
+                ShowHint($"当前已是最新版本 v{current}", "检查更新");
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText.Text = "检查失败";
+            ShowHint($"检查更新失败：{ex.Message}", "检查更新", InfoBarSeverity.Error);
+        }
+        finally
+        {
+            CheckUpdateButton.IsEnabled = true;
         }
     }
 

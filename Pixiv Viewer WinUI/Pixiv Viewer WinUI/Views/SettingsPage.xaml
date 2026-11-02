@@ -402,7 +402,7 @@
                             Grid.Column="2"
                             VerticalAlignment="Center"
                             Style="{StaticResource MetaTextBlockStyle}"
-                            Text="v1.1.0" />
+                            Text="v1.1.1" />
                     </Grid>
 
                     <Rectangle Style="{StaticResource DividerRectangleStyle}" />
@@ -419,6 +419,48 @@
                             VerticalAlignment="Center"
                             Click="OnChangelogClick"
                             Content="查看" />
+                    </Grid>
+
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="检查更新" />
+                            <TextBlock
+                                x:Name="UpdateStatusText"
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="启动时每天检查一次"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button
+                            x:Name="CheckUpdateButton"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Click="OnCheckUpdateClick"
+                            Content="检查" />
+                    </Grid>
+
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock FontSize="14" Text="启动时自动检查更新" />
+                            <TextBlock
+                                Style="{StaticResource MetaTextBlockStyle}"
+                                Text="每天最多检查一次；有新版本时弹窗提示"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="UpdateSwitch"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            OffContent=""
+                            OnContent=""
+                            Toggled="OnAutoCheckUpdateToggled" />
                     </Grid>
 
                     <Grid ColumnSpacing="16">

@@ -58,6 +58,23 @@ namespace Pixiv_Viewer_WinUI
 
             // 后台恢复登录态，首页/收藏等页面首次加载时就能直接拿到数据。
             _ = SignInAsync();
+
+            // 启动 5 秒后检查更新（每天最多一次，失败静默）
+            _ = CheckUpdatesAsync();
+        }
+
+        private static async System.Threading.Tasks.Task CheckUpdatesAsync()
+        {
+            await System.Threading.Tasks.Task.Delay(System.TimeSpan.FromSeconds(5));
+
+            try
+            {
+                await UpdateCoordinator.CheckOnStartupAsync();
+            }
+            catch (System.Exception)
+            {
+                // 更新检查失败不影响使用
+            }
         }
 
         private static async System.Threading.Tasks.Task SignInAsync()

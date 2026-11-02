@@ -94,6 +94,9 @@ public sealed class AppSettings : ObservableObject
     private PixivConnectionMode _apiMode;
     private string _frontingHostMap;
     private bool _autoFallback;
+    private bool _autoCheckUpdate;
+    private string _skippedUpdateVersion;
+    private DateTimeOffset? _lastUpdateCheck;
 
     public AppSettings()
     {
@@ -105,6 +108,11 @@ public sealed class AppSettings : ObservableObject
             : PixivConnectionMode.ReverseProxy;
         _frontingHostMap = ResolveFrontingHostMap(stored.FrontingHostMap);
         _autoFallback = stored.AutoFallback;
+        _autoCheckUpdate = stored.AutoCheckUpdate;
+        _skippedUpdateVersion = stored.SkippedUpdateVersion ?? string.Empty;
+        _lastUpdateCheck = DateTimeOffset.TryParse(stored.LastUpdateCheckUtc, out var lastCheck)
+            ? lastCheck
+            : null;
 
         // 旧默认值被自动升级时顺手落盘，设置页里也能看到新的 IP
         if (!string.IsNullOrWhiteSpace(stored.FrontingHostMap) &&
@@ -223,6 +231,45 @@ public sealed class AppSettings : ObservableObject
     public bool IsApiConfigured =>
         _apiMode == PixivConnectionMode.DomainFronting || _apiBaseUrl.Length > 0 || _autoFallback;
 
+    /// <summary>启动时自动检查更新。</summary>
+    public bool AutoCheckUpdate
+    {
+        get => _autoCheckUpdate;
+        set
+        {
+            if (SetProperty(ref _autoCheckUpdate, value))
+            {
+                Persist();
+            }
+        }
+    }
+
+    /// <summary>用户选择「跳过此版本」的版本号；空表示不跳过。</summary>
+    public string SkippedUpdateVersion
+    {
+        get => _skippedUpdateVersion;
+        set
+        {
+            if (SetProperty(ref _skippedUpdateVersion, value ?? string.Empty))
+            {
+                Persist();
+            }
+        }
+    }
+
+    /// <summary>上次检查更新的时间（每天最多自动查一次）。</summary>
+    public DateTimeOffset? LastUpdateCheck
+    {
+        get => _lastUpdateCheck;
+        set
+        {
+            if (SetProperty(ref _lastUpdateCheck, value))
+            {
+                Persist();
+            }
+        }
+    }
+
     private void Persist()
     {
         SettingsStore.Save(new StoredSettings
@@ -231,6 +278,9 @@ public sealed class AppSettings : ObservableObject
             ApiMode = _apiMode == PixivConnectionMode.DomainFronting ? "fronting" : "proxy",
             FrontingHostMap = _frontingHostMap,
             AutoFallback = _autoFallback,
+            AutoCheckUpdate = _autoCheckUpdate,
+            SkippedUpdateVersion = _skippedUpdateVersion,
+            LastUpdateCheckUtc = _lastUpdateCheck?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
         });
     }
 

@@ -13,7 +13,7 @@
 ; ============================================================
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.1.0"
+  #define MyAppVersion "1.1.1"
 #endif
 
 #ifndef MySourceDir
@@ -88,6 +88,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+; 自动更新（静默安装）：装完自动拉起新版。runasoriginaluser 保证程序不以管理员权限运行。
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--updated"; Flags: nowait runasoriginaluser; Check: WizardSilent
 
 [UninstallDelete]
 ; 安装目录本身由 Inno 负责清理，这里只兜底删掉运行期可能残留的日志
