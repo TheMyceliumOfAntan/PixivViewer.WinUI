@@ -113,15 +113,10 @@
         <!--  黑名单  -->
         <StackPanel Spacing="6">
             <TextBlock Style="{StaticResource SectionHeaderTextBlockStyle}" Text="黑名单标签" />
-            <TextBox
-                x:Name="BlockedBox"
-                PlaceholderText="逗号或空格分隔，例如：グロ, AI生成" />
-
-            <!--  黑名单标签候选：选中后追加到上面的输入框  -->
+            <!--  一个输入框搞定：选中候选自动接在后面，用逗号分隔  -->
             <AutoSuggestBox
-                x:Name="BlockedTagInput"
-                Margin="0,4,0,0"
-                PlaceholderText="也可以在这里输入中文/英文补全后添加"
+                x:Name="BlockedBox"
+                PlaceholderText="逗号分隔，可输入中文/英文自动补全，例如：グロ, 公式"
                 QueryIcon="Add"
                 QuerySubmitted="OnBlockedTagQuerySubmitted"
                 TextChanged="OnBlockedTagTextChanged">

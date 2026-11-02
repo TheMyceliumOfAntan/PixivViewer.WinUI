@@ -152,34 +152,34 @@ public sealed partial class FilterDialog : ContentDialog
 
     private CancellationTokenSource? _blockedSuggestCts;
 
-    /// <summary>黑名单：选中候选 / 回车后追加到黑名单输入框。</summary>
-    private void OnBlockedTagQuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+    private static readonly char[] BlockedSeparators = { ',', '，', ' ', '\t', ';', '；' };
+
+    /// <summary>黑名单输入框里「最后一个分隔符之后」的片段，用来查候选。</summary>
+    private static (string Prefix, string Word) SplitLastWord(string? text)
     {
-        var tag = ((args.ChosenSuggestion as TagSuggestion)?.Tag ?? args.QueryText ?? string.Empty).Trim();
+        var value = text ?? string.Empty;
+        var index = value.LastIndexOfAny(BlockedSeparators);
 
-        sender.Text = string.Empty;
-        sender.ItemsSource = null;
-
-        if (tag.Length == 0)
-        {
-            return;
-        }
-
-        var separators = new[] { ',', '，', ' ', '\t', ';', '；' };
-        var parts = BlockedBox.Text
-            .Split(separators, StringSplitOptions.RemoveEmptyEntries)
-            .ToList();
-
-        if (parts.Any(p => string.Equals(p, tag, StringComparison.OrdinalIgnoreCase)))
-        {
-            return;
-        }
-
-        parts.Add(tag);
-        BlockedBox.Text = string.Join(", ", parts);
+        return index < 0
+            ? (string.Empty, value.Trim())
+            : (value[..(index + 1)], value[(index + 1)..].Trim());
     }
 
-    /// <summary>黑名单输入框的标签候选（和上面、搜索页同一套接口）。</summary>
+    /// <summary>选中候选：把最后一个词替换成日文原文标签，并补一个逗号方便继续输入。</summary>
+    private void OnBlockedTagQuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+    {
+        if (args.ChosenSuggestion is not TagSuggestion suggestion)
+        {
+            // 直接回车不做处理（交给对话框的「应用」）
+            return;
+        }
+
+        var (prefix, _) = SplitLastWord(sender.Text);
+        sender.Text = prefix + suggestion.Tag + ", ";
+        sender.ItemsSource = null;
+    }
+
+    /// <summary>黑名单输入框的标签候选（和标签筛选、搜索页同一套接口）。</summary>
     private async void OnBlockedTagTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
         if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
@@ -187,13 +187,13 @@ public sealed partial class FilterDialog : ContentDialog
             return;
         }
 
-        var text = sender.Text.Trim();
+        var (_, word) = SplitLastWord(sender.Text);
 
         _blockedSuggestCts?.Cancel();
         _blockedSuggestCts?.Dispose();
         _blockedSuggestCts = null;
 
-        if (text.Length == 0)
+        if (word.Length == 0)
         {
             sender.ItemsSource = null;
             return;
@@ -205,7 +205,7 @@ public sealed partial class FilterDialog : ContentDialog
         try
         {
             await Task.Delay(300, cts.Token);
-            var items = await AppServices.Pixiv.SuggestTagsAsync(text, cts.Token);
+            var items = await AppServices.Pixiv.SuggestTagsAsync(word, cts.Token);
 
             if (!cts.IsCancellationRequested)
             {
