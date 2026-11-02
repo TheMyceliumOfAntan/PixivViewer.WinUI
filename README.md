@@ -150,4 +150,4 @@ Pixiv 会阶段性限制评论接口，程序会自动重试旧端点；网络�
 
 ## 许可证
 
-暂未指定。如需开源分发，请先补充 `LICENSE`。
+本项目采用 **GNU General Public License v3.0** 许可，详见 [LICENSE](LICENSE)。
