@@ -81,4 +81,7 @@ public sealed class PixivService : IPixivService
     // TODO: POST /v1/illust/comment/add
     public Task<Comment?> PostCommentAsync(string id, string text, CancellationToken cancellationToken = default)
         => Task.FromResult<Comment?>(null);
+
+    public Task<Comment?> PostStampAsync(string id, string stampId, CancellationToken cancellationToken = default)
+        => Task.FromResult<Comment?>(null);
 }

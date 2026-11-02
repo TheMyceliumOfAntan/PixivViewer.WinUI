@@ -959,22 +959,61 @@ public sealed class PixivApiService : IPixivService
         return await PostFormAsync("/v1/user/follow/delete", fields, cancellationToken);
     }
 
-    public async Task<Comment?> PostCommentAsync(string id, string text, CancellationToken cancellationToken = default)
+    public Task<Comment?> PostCommentAsync(string id, string text, CancellationToken cancellationToken = default)
     {
-        // App API 的 /v1/illust/comment/add 已下线；现在网页版作品页走的是
-        //   POST https://www.pixiv.net/rpc/post_comment.php
-        //   Content-Type: application/x-www-form-urlencoded; charset=utf-8
-        //   type=comment&illust_id=…&author_user_id=…&comment=…
-        // 除登录 cookie + Referer 外，Pixiv 还校验 x-csrf-token：
-        // token 藏在作品页 SSR 数据里（serverSerializedPreloadedState → api.token），
-        // 每个会话会变，所以发送前先取一次并短时缓存。
         var authorId = _session.User?.Id;
         if (string.IsNullOrWhiteSpace(authorId) || string.IsNullOrWhiteSpace(_session.SessionCookie))
         {
             PixivDiagnostics.Write("post comment: 缺少登录态（需要 refresh_token + 网页 cookie）");
-            return null;
+            return Task.FromResult<Comment?>(null);
         }
 
+        return PostRpcAsync(
+            id,
+            new Dictionary<string, string>
+            {
+                ["type"] = "comment",
+                ["illust_id"] = id,
+                ["author_user_id"] = authorId,
+                ["comment"] = text,
+            },
+            text,
+            null,
+            cancellationToken);
+    }
+
+    /// <summary>发一张表情贴图（评论只能是文字或贴图，二选一）。</summary>
+    public Task<Comment?> PostStampAsync(string id, string stampId, CancellationToken cancellationToken = default)
+    {
+        var authorId = _session.User?.Id;
+        if (string.IsNullOrWhiteSpace(authorId) || string.IsNullOrWhiteSpace(_session.SessionCookie) ||
+            string.IsNullOrWhiteSpace(stampId))
+        {
+            PixivDiagnostics.Write("post stamp: 缺少登录态或 stamp_id");
+            return Task.FromResult<Comment?>(null);
+        }
+
+        return PostRpcAsync(
+            id,
+            new Dictionary<string, string>
+            {
+                ["type"] = "stamp",
+                ["illust_id"] = id,
+                ["author_user_id"] = authorId,
+                ["stamp_id"] = stampId,
+            },
+            string.Empty,
+            stampId,
+            cancellationToken);
+    }
+
+    private async Task<Comment?> PostRpcAsync(
+        string id,
+        Dictionary<string, string> fields,
+        string text,
+        string? stampId,
+        CancellationToken cancellationToken)
+    {
         try
         {
             for (var attempt = 0; attempt < 2; attempt++)
@@ -990,13 +1029,7 @@ public sealed class PixivApiService : IPixivService
                     HttpMethod.Post,
                     $"{_endpoints.WebBase}/rpc/post_comment.php")
                 {
-                    Content = new FormUrlEncodedContent(new Dictionary<string, string>
-                    {
-                        ["type"] = "comment",
-                        ["illust_id"] = id,
-                        ["author_user_id"] = authorId,
-                        ["comment"] = text,
-                    }),
+                    Content = new FormUrlEncodedContent(fields),
                 };
 
                 // 与网页端一致：带 charset
@@ -1041,6 +1074,10 @@ public sealed class PixivApiService : IPixivService
                 return new Comment
                 {
                     Text = text,
+                    StampId = stampId ?? string.Empty,
+                    StampUrl = string.IsNullOrEmpty(stampId)
+                        ? null
+                        : ProxyStatic($"common/images/stamp/generated-stamps/{stampId}_s.jpg"),
                     CreatedAt = DateTimeOffset.Now,
                     User = _session.User ?? new PixivUser(),
                 };

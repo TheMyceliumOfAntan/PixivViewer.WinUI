@@ -841,10 +841,50 @@
                                 BorderThickness="1"
                                 CornerRadius="6"
                                 Visibility="Collapsed">
-                                <StackPanel x:Name="EmojiHost" Spacing="2" />
+                                <StackPanel Spacing="6">
+                                    <SelectorBar x:Name="EmojiTabs" SelectionChanged="OnEmojiTabChanged">
+                                        <SelectorBarItem
+                                            IsSelected="True"
+                                            Tag="emoji"
+                                            Text="绘文字" />
+                                        <SelectorBarItem Tag="stamp" Text="表情贴图" />
+                                    </SelectorBar>
+
+                                    <StackPanel x:Name="EmojiHost" Spacing="2" />
+                                    <StackPanel
+                                        x:Name="StampHost"
+                                        Spacing="2"
+                                        Visibility="Collapsed" />
+                                </StackPanel>
                             </Border>
 
-                            <Grid ColumnSpacing="8">
+                            <!--  待发送的贴图  -->
+                            <Border
+                                x:Name="StampPreview"
+                                Padding="8"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Image
+                                        x:Name="StampPreviewImage"
+                                        Width="64"
+                                        Height="64"
+                                        Stretch="Uniform" />
+                                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock FontSize="14" Text="将发送这张贴图" />
+                                        <TextBlock Style="{StaticResource MetaTextBlockStyle}" Text="贴图评论不能同时带文字" />
+                                        <HyperlinkButton
+                                            Padding="0"
+                                            Click="OnCancelStampClick"
+                                            Content="取消" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Grid x:Name="CommentInputRow" ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />

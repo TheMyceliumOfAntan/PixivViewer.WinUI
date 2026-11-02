@@ -447,6 +447,26 @@ public sealed class IllustrationDetailViewModel : ObservableObject
         return true;
     }
 
+    /// <summary>发一张贴图评论。</summary>
+    public async Task<bool> AddStampCommentAsync(string stampId)
+    {
+        if (string.IsNullOrWhiteSpace(stampId))
+        {
+            return false;
+        }
+
+        var posted = await AppServices.Pixiv.PostStampAsync(Id, stampId);
+        if (posted is null)
+        {
+            return false;
+        }
+
+        Comments.Insert(0, posted);
+        NewCommentText = string.Empty;
+        OnPropertiesChanged(nameof(CommentsHeader), nameof(HasComments));
+        return true;
+    }
+
     private void BuildPages()
     {
         Pages.Clear();

@@ -52,4 +52,7 @@ public interface IPixivService
     Task<bool> SetFollowAsync(string userId, bool isFollowed, CancellationToken cancellationToken = default);
 
     Task<Comment?> PostCommentAsync(string id, string text, CancellationToken cancellationToken = default);
+
+    /// <summary>发一张表情贴图（评论只能是文字或贴图，二选一）。</summary>
+    Task<Comment?> PostStampAsync(string id, string stampId, CancellationToken cancellationToken = default);
 }

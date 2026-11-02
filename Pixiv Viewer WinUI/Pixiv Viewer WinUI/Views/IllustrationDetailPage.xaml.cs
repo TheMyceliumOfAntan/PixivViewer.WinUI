@@ -796,6 +796,12 @@ public sealed partial class IllustrationDetailPage : Page
 
     private async void OnSendCommentClick(object sender, RoutedEventArgs e)
     {
+        if (_pendingStampId is { } stampId)
+        {
+            await SendStampAsync(stampId);
+            return;
+        }
+
         var text = BuildCommentText().Trim();
         if (text.Length == 0)
         {
@@ -840,6 +846,36 @@ public sealed partial class IllustrationDetailPage : Page
 
     // ---------------------------------------------------------------- 评论编辑器
 
+    private async Task SendStampAsync(string stampId)
+    {
+        SendButton.IsEnabled = false;
+        EmojiButton.IsEnabled = false;
+        SendButton.Content = "发送中…";
+
+        try
+        {
+            var ok = await View.AddStampCommentAsync(stampId);
+            if (ok)
+            {
+                ClearStamp();
+                ShowHint("贴图已发送");
+            }
+            else
+            {
+                ShowHint("贴图发送失败：请检查登录状态、网页 Cookie 或网络");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowHint($"贴图发送失败：{ex.Message}");
+        }
+        finally
+        {
+            SendButton.Content = "发送";
+            EmojiButton.IsEnabled = true;
+            UpdateCommentState();
+        }
+    }
     /// <summary>pixiv 评论长度上限。</summary>
     private const int MaxCommentLength = 140;
 
@@ -848,10 +884,40 @@ public sealed partial class IllustrationDetailPage : Page
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> EmojiBytes = new();
 
+    /// <summary>官方贴图 id：101–110 / 201–210 / 301–310 / 401–410。</summary>
+    private static readonly int[] StampIds = BuildStampIds();
+
+    private static int[] BuildStampIds()
+    {
+        var ids = new List<int>(40);
+
+        foreach (var group in new[] { 1, 2, 3, 4 })
+        {
+            for (var index = 1; index <= 10; index++)
+            {
+                ids.Add((group * 100) + index);
+            }
+        }
+
+        return ids.ToArray();
+    }
+
+    /// <summary>当前选中的待发送贴图；null 表示文字模式。</summary>
+    private string? _pendingStampId;
+
+    private static string StampUrl(int id)
+        => $"https://s.pximg.net/common/images/stamp/generated-stamps/{id}_s.jpg";
+
     private void OnCommentTextChanged(object sender, RoutedEventArgs e) => UpdateCommentState();
 
     private void UpdateCommentState()
     {
+        if (_pendingStampId is not null)
+        {
+            SendButton.IsEnabled = true;
+            return;
+        }
+
         var text = BuildCommentText();
         CommentCounter.Text = $"{text.Length} / {MaxCommentLength}";
         SendButton.IsEnabled = text.Trim().Length is > 0 and <= MaxCommentLength;
@@ -1010,6 +1076,114 @@ public sealed partial class IllustrationDetailPage : Page
 
         // 面板内联显示，按钮不抢焦点；这里再兜底把焦点还给编辑器
         CommentBox.Focus(FocusState.Programmatic);
+    }
+
+    private void OnEmojiTabChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
+    {
+        var stamp = sender.SelectedItem?.Tag as string == "stamp";
+
+        EmojiHost.Visibility = stamp ? Visibility.Collapsed : Visibility.Visible;
+        StampHost.Visibility = stamp ? Visibility.Visible : Visibility.Collapsed;
+
+        if (stamp && StampHost.Children.Count == 0)
+        {
+            BuildStampPanel();
+        }
+    }
+
+    private void BuildStampPanel()
+    {
+        for (var i = 0; i < StampIds.Length; i += 5)
+        {
+            var row = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 2,
+            };
+
+            foreach (var id in StampIds.Skip(i).Take(5))
+            {
+                row.Children.Add(CreateStampButton(id));
+            }
+
+            StampHost.Children.Add(row);
+        }
+    }
+
+    private Button CreateStampButton(int id)
+    {
+        var image = new Image
+        {
+            Width = 56,
+            Height = 56,
+            Stretch = Stretch.Uniform,
+        };
+
+        _ = LoadEmojiThumbAsync(StampUrl(id), image);
+
+        var button = new Button
+        {
+            Width = 60,
+            Height = 60,
+            Padding = new Thickness(0),
+            Content = image,
+            Tag = id,
+            AllowFocusOnInteraction = false,
+            IsTabStop = false,
+        };
+
+        ToolTipService.SetToolTip(button, $"贴图 {id}");
+
+        button.Click += (s, _) =>
+        {
+            if (s is Button { Tag: int stampId })
+            {
+                SelectStamp(stampId);
+            }
+        };
+
+        return button;
+    }
+
+    /// <summary>选中一张贴图：切到贴图模式，文字框禁用（贴图和文字不能同时发）。</summary>
+    private async void SelectStamp(int id)
+    {
+        _pendingStampId = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        StampPreview.Visibility = Visibility.Visible;
+        EmojiPanel.Visibility = Visibility.Collapsed;
+        CommentCounter.Visibility = Visibility.Collapsed;
+        CommentBox.Document.SetText(TextSetOptions.None, string.Empty);
+        CommentBox.IsEnabled = false;
+
+        try
+        {
+            StampPreviewImage.Source = await ImageCache.GetAsync(AppServices.MapStaticUrl(StampUrl(id)), 160);
+        }
+        catch (Exception)
+        {
+            // 预览失败不影响发送
+        }
+
+        UpdateCommentState();
+    }
+
+    private void OnCancelStampClick(object sender, RoutedEventArgs e) => ClearStamp();
+
+    private void ClearStamp()
+    {
+        if (_pendingStampId is null)
+        {
+            return;
+        }
+
+        _pendingStampId = null;
+        StampPreview.Visibility = Visibility.Collapsed;
+        StampPreviewImage.Source = null;
+        CommentCounter.Visibility = Visibility.Visible;
+        CommentBox.IsEnabled = true;
+        CommentBox.Document.SetText(TextSetOptions.None, string.Empty);
+        UpdateCommentState();
     }
 
     private void BuildEmojiPanel()
