@@ -62,9 +62,6 @@ public static class PixivEmoji
         ["star"] = 503,
     };
 
-    /// <summary>emoji id → slug（编辑区标记反查用）。</summary>
-    private static readonly Dictionary<int, string> SlugsById = Ids.ToDictionary(pair => pair.Value, pair => pair.Key);
-
     /// <summary>全部表情（slug + 贴纸 URL），按 id 排序，供表情选择面板使用。</summary>
     public static IReadOnlyList<(string Slug, string Url)> All { get; } = Ids
         .OrderBy(pair => pair.Value)
@@ -73,9 +70,6 @@ public static class PixivEmoji
 
     public static int IdForSlug(string slug)
         => Ids.TryGetValue(slug, out var id) ? id : 0;
-
-    public static string? SlugForId(int id)
-        => SlugsById.TryGetValue(id, out var slug) ? slug : null;
 
     /// <summary>同一批表情的 Unicode 近似值（仅用于翻译时保留语义）。</summary>
     private static readonly Dictionary<string, string> Unicode = new(StringComparer.OrdinalIgnoreCase)

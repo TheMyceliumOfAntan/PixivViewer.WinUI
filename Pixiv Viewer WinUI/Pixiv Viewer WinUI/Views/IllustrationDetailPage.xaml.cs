@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -845,13 +846,6 @@ public sealed partial class IllustrationDetailPage : Page
     /// <summary>RichEditBox 里图片在文本中的占位符。</summary>
     private const char ImagePlaceholder = '\uFFFC';
 
-    /// <summary>slug 标记的起止符（零宽，编辑时不可见）。</summary>
-    private const char MarkerBoundary = '\u2060';
-
-    private const char MarkerBitZero = '\u200B';
-    private const char MarkerBitOne = '\u200C';
-    private const int MarkerBits = 10;
-
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> EmojiBytes = new();
     private static Flyout? _emojiFlyout;
 
@@ -871,128 +865,137 @@ public sealed partial class IllustrationDetailPage : Page
     }
 
     /// <summary>
-    /// 把 RichEditBox 的内容转成 pixiv 能识别的文本：图片 → <c>(slug)</c>，
-    /// 零宽标记只用于定位图片对应的表情，不会出现在结果里。
+    /// 把 RichEditBox 的内容转成 pixiv 能识别的文本：图片 → <c>(slug)</c>。
+    /// slug 存在图片的 alternateText 里（RTF 的 \picprop wzDescription），
+    /// 图片本身只占一个字符，删除/撤销都是一次一个整体。
     /// </summary>
     private string BuildCommentText()
     {
-        CommentBox.Document.GetText(TextGetOptions.None, out var raw);
+        CommentBox.Document.GetText(TextGetOptions.None, out var plain);
+        var slugs = ReadEmojiDescriptions();
 
-        var builder = new System.Text.StringBuilder(raw.Length);
-        var pendingId = 0;
+        var builder = new System.Text.StringBuilder(plain.Length);
+        var imageIndex = 0;
 
-        for (var i = 0; i < raw.Length; i++)
+        for (var i = 0; i < plain.Length; i++)
         {
-            var c = raw[i];
-
-            if (c == MarkerBoundary)
-            {
-                if (TryReadMarker(raw, i, out var markerId, out var markerLength))
-                {
-                    pendingId = markerId;
-                    i += markerLength - 1;
-                }
-                else
-                {
-                    i = SkipMarker(raw, i);
-                }
-
-                continue;
-            }
+            var c = plain[i];
 
             if (c == ImagePlaceholder)
             {
-                if (pendingId != 0)
+                if (imageIndex < slugs.Count && slugs[imageIndex] is { } slug)
                 {
-                    var slug = PixivEmoji.SlugForId(pendingId);
-                    if (slug is not null)
-                    {
-                        builder.Append('(').Append(slug).Append(')');
-                    }
-
-                    pendingId = 0;
+                    builder.Append('(').Append(slug).Append(')');
                 }
 
+                imageIndex++;
                 continue;
             }
 
-            // 标记后面不是图片 → 孤立标记，丢弃
-            pendingId = 0;
             builder.Append(c == '\r' ? '\n' : c);
         }
 
         return builder.ToString().TrimEnd();
     }
 
-    private static string EncodeMarker(int id)
+    /// <summary>按文档顺序读出每张图片的 alternateText（emoji slug）。</summary>
+    private List<string?> ReadEmojiDescriptions()
     {
-        var builder = new System.Text.StringBuilder(MarkerBits + 2);
-        builder.Append(MarkerBoundary);
+        var slugs = new List<string?>();
 
-        for (var bit = MarkerBits - 1; bit >= 0; bit--)
+        try
         {
-            builder.Append(((id >> bit) & 1) == 1 ? MarkerBitOne : MarkerBitZero);
+            CommentBox.Document.GetText(TextGetOptions.FormatRtf, out var rtf);
+            slugs.AddRange(ParsePictDescriptions(rtf));
+        }
+        catch (Exception ex)
+        {
+            PixivDiagnostics.Write($"read emoji descriptions failed: {ex.Message}");
         }
 
-        builder.Append(MarkerBoundary);
-        return builder.ToString();
+        return slugs;
     }
 
-    private static bool TryReadMarker(string raw, int start, out int id, out int length)
+    /// <summary>从 RTF 的 \pict 组里按顺序取 alternateText；不是合法 slug 的返回 null。</summary>
+    private static IEnumerable<string?> ParsePictDescriptions(string rtf)
     {
-        id = 0;
-        length = 0;
-
-        if (start >= raw.Length || raw[start] != MarkerBoundary)
+        foreach (var group in ExtractPictGroups(rtf))
         {
-            return false;
-        }
-
-        if (start + MarkerBits + 1 >= raw.Length)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < MarkerBits; i++)
-        {
-            var c = raw[start + 1 + i];
-            if (c != MarkerBitZero && c != MarkerBitOne)
+            var description = group.IndexOf("wzDescription", StringComparison.Ordinal);
+            if (description < 0)
             {
-                return false;
+                yield return null;
+                continue;
             }
 
-            id = (id << 1) | (c == MarkerBitOne ? 1 : 0);
-        }
+            var value = group.IndexOf("\\sv ", description, StringComparison.Ordinal);
+            if (value < 0)
+            {
+                yield return null;
+                continue;
+            }
 
-        if (raw[start + 1 + MarkerBits] != MarkerBoundary)
-        {
-            return false;
-        }
+            var start = value + 4;
+            var end = group.IndexOf('}', start);
+            if (end <= start)
+            {
+                yield return null;
+                continue;
+            }
 
-        length = MarkerBits + 2;
-        return true;
+            var slug = group[start..end].Trim();
+            yield return PixivEmoji.IdForSlug(slug) > 0 ? slug : null;
+        }
     }
 
-    /// <summary>跳过一段孤立标记（图片被删掉但标记残留）。</summary>
-    private static int SkipMarker(string raw, int start)
+    /// <summary>按出现顺序取出 RTF 里的每个 \pict 组（花括号配对）。</summary>
+    private static IEnumerable<string> ExtractPictGroups(string rtf)
     {
-        var end = raw.IndexOf(MarkerBoundary, start + 1);
-        return end < 0 ? start : end;
-    }
+        var index = 0;
 
-    /// <summary>把光标移到刚插入的表情块之后。</summary>
-    private int SkipEmojiBlock(int position)
-    {
-        CommentBox.Document.GetText(TextGetOptions.None, out var raw);
-
-        var index = Math.Clamp(position, 0, raw.Length);
-        while (index < raw.Length &&
-               raw[index] is ImagePlaceholder or MarkerBoundary or MarkerBitZero or MarkerBitOne)
+        while (index < rtf.Length)
         {
-            index++;
-        }
+            var pict = rtf.IndexOf("\\pict", index, StringComparison.Ordinal);
+            if (pict < 0)
+            {
+                yield break;
+            }
 
-        return index;
+            var start = rtf.LastIndexOf('{', pict);
+            if (start < 0)
+            {
+                index = pict + 5;
+                continue;
+            }
+
+            var depth = 0;
+            var end = -1;
+
+            for (var i = start; i < rtf.Length; i++)
+            {
+                if (rtf[i] == '{')
+                {
+                    depth++;
+                }
+                else if (rtf[i] == '}')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        end = i;
+                        break;
+                    }
+                }
+            }
+
+            if (end < 0)
+            {
+                yield break;
+            }
+
+            yield return rtf[start..(end + 1)];
+            index = end + 1;
+        }
     }
 
     private void OnEmojiClick(object sender, RoutedEventArgs e)
@@ -1080,12 +1083,6 @@ public sealed partial class IllustrationDetailPage : Page
 
     private async void InsertEmoji(string slug)
     {
-        var id = PixivEmoji.IdForSlug(slug);
-        if (id == 0)
-        {
-            return;
-        }
-
         var bytes = await GetEmojiBytesAsync(slug);
         if (bytes is null)
         {
@@ -1099,13 +1096,6 @@ public sealed partial class IllustrationDetailPage : Page
             var start = selection.StartPosition;
             var end = selection.EndPosition;
 
-            // 先放零宽标记，再把图片插到标记后面（RichEdit 的实际存储顺序）
-            var markerRange = CommentBox.Document.GetRange(start, end);
-            markerRange.SetText(TextSetOptions.None, EncodeMarker(id));
-            markerRange.Collapse(false);
-
-            var imageRange = CommentBox.Document.GetRange(markerRange.EndPosition, markerRange.EndPosition);
-
             using (var stream = new InMemoryRandomAccessStream())
             {
                 using (var writer = new DataWriter(stream))
@@ -1117,11 +1107,14 @@ public sealed partial class IllustrationDetailPage : Page
                 }
 
                 stream.Seek(0);
-                imageRange.InsertImage(20, 20, 0, VerticalCharacterAlignment.Baseline, slug, stream);
+
+                // 图片的 alternateText 存 slug：RTF 里会写成 \picprop wzDescription，
+                // 发送时按图片顺序读回来，编辑器里图片只占一个字符（可整体删除）。
+                var range = CommentBox.Document.GetRange(start, end);
+                range.InsertImage(20, 20, 0, VerticalCharacterAlignment.Baseline, slug, stream);
             }
 
-            // 从原光标位置往后跳过「标记 + 图片」块，保证下一次输入/插表情接在后面
-            var caret = SkipEmojiBlock(start);
+            var caret = Math.Min(start + 1, CommentBox.Document.GetRange(0, int.MaxValue).EndPosition);
             CommentBox.Document.Selection.SetRange(caret, caret);
 
             CommentBox.Focus(FocusState.Programmatic);
