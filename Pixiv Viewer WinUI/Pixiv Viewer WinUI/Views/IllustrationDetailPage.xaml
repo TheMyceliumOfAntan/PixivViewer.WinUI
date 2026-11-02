@@ -831,7 +831,19 @@
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                         BorderThickness="0,1,0,0"
                         Visibility="{x:Bind View.ShowCommentInput, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
-                        <StackPanel Spacing="4">
+                        <StackPanel Spacing="6">
+                            <!--  表情面板（内联，不抢编辑器焦点）  -->
+                            <Border
+                                x:Name="EmojiPanel"
+                                Padding="6"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="Collapsed">
+                                <StackPanel x:Name="EmojiHost" Spacing="2" />
+                            </Border>
+
                             <Grid ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -854,6 +866,7 @@
                                 <Button
                                     x:Name="EmojiButton"
                                     Grid.Column="1"
+                                    AllowFocusOnInteraction="False"
                                     VerticalAlignment="Center"
                                     Click="OnEmojiClick"
                                     ToolTipService.ToolTip="插入表情">

@@ -847,7 +847,6 @@ public sealed partial class IllustrationDetailPage : Page
     private const char ImagePlaceholder = '\uFFFC';
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> EmojiBytes = new();
-    private static Flyout? _emojiFlyout;
 
     private void OnCommentTextChanged(object sender, RoutedEventArgs e) => UpdateCommentState();
 
@@ -1000,13 +999,21 @@ public sealed partial class IllustrationDetailPage : Page
 
     private void OnEmojiClick(object sender, RoutedEventArgs e)
     {
-        _emojiFlyout ??= BuildEmojiFlyout();
-        _emojiFlyout.ShowAt(EmojiButton);
+        if (EmojiHost.Children.Count == 0)
+        {
+            BuildEmojiPanel();
+        }
+
+        EmojiPanel.Visibility = EmojiPanel.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+        // 面板内联显示，按钮不抢焦点；这里再兜底把焦点还给编辑器
+        CommentBox.Focus(FocusState.Programmatic);
     }
 
-    private Flyout BuildEmojiFlyout()
+    private void BuildEmojiPanel()
     {
-        var panel = new StackPanel { Spacing = 4, Padding = new Thickness(4) };
         var emojis = PixivEmoji.All;
 
         for (var i = 0; i < emojis.Count; i += 6)
@@ -1022,14 +1029,8 @@ public sealed partial class IllustrationDetailPage : Page
                 row.Children.Add(CreateEmojiButton(slug, url));
             }
 
-            panel.Children.Add(row);
+            EmojiHost.Children.Add(row);
         }
-
-        return new Flyout
-        {
-            Content = panel,
-            Placement = FlyoutPlacementMode.Top,
-        };
     }
 
     private Button CreateEmojiButton(string slug, string url)
@@ -1050,6 +1051,9 @@ public sealed partial class IllustrationDetailPage : Page
             Padding = new Thickness(0),
             Content = image,
             Tag = slug,
+            // 关键：点表情按钮不夺走 RichEditBox 的焦点，否则插入后无法继续输入
+            AllowFocusOnInteraction = false,
+            IsTabStop = false,
         };
 
         ToolTipService.SetToolTip(button, $":{slug}:");

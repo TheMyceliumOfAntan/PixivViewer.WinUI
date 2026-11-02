@@ -963,9 +963,11 @@ public sealed class PixivApiService : IPixivService
     {
         // App API 的 /v1/illust/comment/add 已下线；现在网页版作品页走的是
         //   POST https://www.pixiv.net/rpc/post_comment.php
-        //   Content-Type: application/x-www-form-urlencoded
+        //   Content-Type: application/x-www-form-urlencoded; charset=utf-8
         //   type=comment&illust_id=…&author_user_id=…&comment=…
-        // 需要网页登录态（PHPSESSID），并校验 Referer 是作品页。
+        // 除登录 cookie + Referer 外，Pixiv 还校验 x-csrf-token：
+        // token 藏在作品页 SSR 数据里（serverSerializedPreloadedState → api.token），
+        // 每个会话会变，所以发送前先取一次并短时缓存。
         var authorId = _session.User?.Id;
         if (string.IsNullOrWhiteSpace(authorId) || string.IsNullOrWhiteSpace(_session.SessionCookie))
         {
@@ -975,52 +977,127 @@ public sealed class PixivApiService : IPixivService
 
         try
         {
-            using var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                $"{_endpoints.WebBase}/rpc/post_comment.php")
+            for (var attempt = 0; attempt < 2; attempt++)
             {
-                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                var token = await GetCsrfTokenAsync(id, attempt > 0, cancellationToken);
+                if (string.IsNullOrEmpty(token))
                 {
-                    ["type"] = "comment",
-                    ["illust_id"] = id,
-                    ["author_user_id"] = authorId,
-                    ["comment"] = text,
-                }),
-            };
+                    PixivDiagnostics.Write("post comment: 取不到 csrf token");
+                    return null;
+                }
 
-            request.Headers.TryAddWithoutValidation("User-Agent", WebUserAgent);
-            request.Headers.TryAddWithoutValidation(_endpoints.CookieHeaderName, _session.SessionCookie);
-            request.Headers.TryAddWithoutValidation(
-                _endpoints.UsesReverseProxy ? "X-Pixiv-Referer" : "Referer",
-                $"https://www.pixiv.net/artworks/{id}");
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"{_endpoints.WebBase}/rpc/post_comment.php")
+                {
+                    Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["type"] = "comment",
+                        ["illust_id"] = id,
+                        ["author_user_id"] = authorId,
+                        ["comment"] = text,
+                    }),
+                };
 
-            using var response = await _http.SendAsync(request, cancellationToken);
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                // 与网页端一致：带 charset
+                request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+                    "application/x-www-form-urlencoded")
+                {
+                    CharSet = "utf-8",
+                };
 
-            if (!response.IsSuccessStatusCode)
-            {
-                PixivDiagnostics.Write($"post comment {id} -> {(int)response.StatusCode} {json}");
-                return null;
+                request.Headers.TryAddWithoutValidation("User-Agent", WebUserAgent);
+                request.Headers.TryAddWithoutValidation("Accept", "application/json");
+                request.Headers.TryAddWithoutValidation("x-csrf-token", token);
+                request.Headers.TryAddWithoutValidation(_endpoints.CookieHeaderName, _session.SessionCookie);
+                request.Headers.TryAddWithoutValidation(
+                    _endpoints.UsesReverseProxy ? "X-Pixiv-Referer" : "Referer",
+                    $"https://www.pixiv.net/artworks/{id}");
+
+                using var response = await _http.SendAsync(request, cancellationToken);
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Forbidden && attempt == 0)
+                {
+                    // token 过期/会话变化：丢弃缓存重取一次
+                    PixivDiagnostics.Write($"post comment {id} 首次失败（{(int)response.StatusCode}），重取 token 重试");
+                    InvalidateCsrfToken();
+                    continue;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    PixivDiagnostics.Write($"post comment {id} -> {(int)response.StatusCode} {json}");
+                    return null;
+                }
+
+                var payload = JsonSerializer.Deserialize<PixivStreetCommentRootsResponse>(json, JsonOptions);
+                if (payload is { Error: true })
+                {
+                    PixivDiagnostics.Write($"post comment {id} error: {payload.Message}");
+                    return null;
+                }
+
+                return new Comment
+                {
+                    Text = text,
+                    CreatedAt = DateTimeOffset.Now,
+                    User = _session.User ?? new PixivUser(),
+                };
             }
 
-            var payload = JsonSerializer.Deserialize<PixivStreetCommentRootsResponse>(json, JsonOptions);
-            if (payload is { Error: true })
-            {
-                PixivDiagnostics.Write($"post comment {id} error: {payload.Message}");
-                return null;
-            }
-
-            return new Comment
-            {
-                Text = text,
-                CreatedAt = DateTimeOffset.Now,
-                User = _session.User ?? new PixivUser(),
-            };
+            return null;
         }
         catch (HttpRequestException)
         {
             return null;
         }
+    }
+
+    private string? _csrfToken;
+    private DateTimeOffset _csrfTokenExpiresAt;
+
+    private void InvalidateCsrfToken()
+    {
+        _csrfToken = null;
+        _csrfTokenExpiresAt = DateTimeOffset.MinValue;
+    }
+
+    /// <summary>从作品页的 SSR 数据里取 x-csrf-token（短时缓存）。</summary>
+    private async Task<string?> GetCsrfTokenAsync(string illustId, bool forceRefresh, CancellationToken cancellationToken)
+    {
+        if (!forceRefresh &&
+            !string.IsNullOrEmpty(_csrfToken) &&
+            _csrfTokenExpiresAt > DateTimeOffset.Now)
+        {
+            return _csrfToken;
+        }
+
+        using var response = await SendWebAsync($"/artworks/{illustId}", cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var html = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        var index = html.IndexOf("serverSerializedPreloadedState", StringComparison.Ordinal);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        var window = html.Substring(index, Math.Min(4000, html.Length - index)).Replace("\\\"", "\"");
+        var match = Regex.Match(window, "\"api\"\\s*:\\s*\\{\\s*\"token\"\\s*:\\s*\"([0-9a-f]{32})\"");
+
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        _csrfToken = match.Groups[1].Value;
+        _csrfTokenExpiresAt = DateTimeOffset.Now.AddMinutes(10);
+        return _csrfToken;
     }
 
     // ---------------------------------------------------------------- HTTP
