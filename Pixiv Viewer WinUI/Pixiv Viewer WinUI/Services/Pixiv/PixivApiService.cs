@@ -632,7 +632,7 @@ public sealed class PixivApiService : IPixivService
             // 这个端点不需要登录；有趣的是带上登录 cookie 时 pixiv 只返回 1 个候选，
             // 匿名反而给完整的相关标签 + 中英译名，所以这里刻意不带 cookie。
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.TryAddWithoutValidation("User-Agent", PixivSession.UserAgent);
+            request.Headers.TryAddWithoutValidation("User-Agent", WebUserAgent);
 
             using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
@@ -878,6 +878,11 @@ public sealed class PixivApiService : IPixivService
         => !cancellationToken.IsCancellationRequested &&
            (ex is HttpRequestException or TaskCanceledException or System.IO.IOException);
 
+    /// <summary>网页接口的 UA：反代模式沿用 App UA（由反代自己转换），直连必须用浏览器 UA。</summary>
+    private string WebUserAgent => _endpoints.UsesReverseProxy
+        ? PixivSession.UserAgent
+        : PixivSession.WebUserAgent;
+
     private async Task<HttpResponseMessage> SendWebAsync(string pathAndQuery, CancellationToken cancellationToken)
     {
         EnsureConfigured();
@@ -887,7 +892,7 @@ public sealed class PixivApiService : IPixivService
             var url = _endpoints.WebBase + pathAndQuery;
 
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.TryAddWithoutValidation("User-Agent", PixivSession.UserAgent);
+            request.Headers.TryAddWithoutValidation("User-Agent", WebUserAgent);
 
             // 反代会把 X-Pixiv-Cookie 转成 Cookie 发给 www.pixiv.net；直连必须用标准 Cookie
             if (!string.IsNullOrWhiteSpace(_session.SessionCookie))
@@ -983,7 +988,7 @@ public sealed class PixivApiService : IPixivService
                 }),
             };
 
-            request.Headers.TryAddWithoutValidation("User-Agent", PixivSession.UserAgent);
+            request.Headers.TryAddWithoutValidation("User-Agent", WebUserAgent);
             request.Headers.TryAddWithoutValidation(_endpoints.CookieHeaderName, _session.SessionCookie);
             request.Headers.TryAddWithoutValidation(
                 _endpoints.UsesReverseProxy ? "X-Pixiv-Referer" : "Referer",

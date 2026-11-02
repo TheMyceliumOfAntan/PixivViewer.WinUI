@@ -22,6 +22,8 @@ public static class Changelog
                 "反代失败自动兜底：连不上 / 超时 / 5xx 时自动切到域前置重试，本次运行内保持",
                 "设置 → 服务地址：可选「自建 API 反代」或「域前置直连」，IP 映射可编辑并持久化，支持一键恢复默认",
                 "域前置下图片直连 i.pximg.net（自动补 Referer），缩略图与原图下载同样走直连",
+                "域前置下 www / accounts 改走 Cloudflare IP，评论、收藏集、标签候选恢复正常",
+                "网页接口（www / accounts）改用浏览器 UA：Cloudflare 会拒绝 App API 的 UA（403）",
                 "网页登录支持域前置：本地 CONNECT 隧道只分片 ClientHello，不终止 TLS（检测到系统代理时自动改走系统代理）",
                 "关于页新增 Pixeval 致谢；默认 IP 与实现思路参考自开源项目 Pixeval（GPL-3.0）",
             },

@@ -19,6 +19,13 @@ public sealed class PixivSession
     internal const string ClientSecret = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj";
     internal const string UserAgent = "PixivAndroidApp/5.0.234 (Android 11; Pixel 5)";
 
+    /// <summary>
+    /// 网页版（www / accounts）用的浏览器 UA。
+    /// Cloudflare 会直接 403 掉 App API 的 UA，所以网页接口必须用浏览器标识。
+    /// </summary>
+    internal const string WebUserAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private HttpClient _http;

@@ -28,7 +28,21 @@ public sealed class PixivEndpoints
     public const string StaticHost = "s.pximg.net";
 
     /// <summary>域前置默认 IP（参考 Pixeval / Mako 的公开默认值，可在设置里改）。</summary>
+    /// <remarks>
+    /// www / accounts 必须走 Cloudflare：Pixiv 的 210.140.139.x 是源站，
+    /// 直连源站会被按 IP 拒绝（403），评论 / 标签候选 / 收藏集 / 网页登录都会失败。
+    /// </remarks>
     public static string DefaultHostMap { get; } = string.Join(
+        Environment.NewLine,
+        $"{AppApiHost} = 104.18.42.239, 172.64.145.17",
+        $"{OAuthHost} = 104.18.42.239, 172.64.145.17",
+        $"{WebHost} = 104.18.42.239, 172.64.145.17",
+        $"{AccountHost} = 104.18.42.239, 172.64.145.17",
+        $"{ImageHost} = 210.140.139.134, 210.140.139.135, 210.140.139.136, 210.140.139.137",
+        $"{StaticHost} = 210.140.139.135, 210.140.139.136, 210.140.139.137");
+
+    /// <summary>1.1.0 早期默认值（www/accounts 指向源站，会 403），仅用于升级时自动替换。</summary>
+    public static string LegacyDefaultHostMap { get; } = string.Join(
         Environment.NewLine,
         $"{AppApiHost} = 104.18.42.239, 172.64.145.17",
         $"{OAuthHost} = 104.18.42.239, 172.64.145.17",

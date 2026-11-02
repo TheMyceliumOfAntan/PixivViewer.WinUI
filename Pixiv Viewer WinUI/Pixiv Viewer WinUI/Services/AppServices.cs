@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using Microsoft.UI.Xaml;
 using Pixiv_Viewer_WinUI.Helpers;
@@ -102,11 +103,39 @@ public sealed class AppSettings : ObservableObject
         _apiMode = string.Equals(stored.ApiMode, "fronting", StringComparison.OrdinalIgnoreCase)
             ? PixivConnectionMode.DomainFronting
             : PixivConnectionMode.ReverseProxy;
-        _frontingHostMap = string.IsNullOrWhiteSpace(stored.FrontingHostMap)
-            ? PixivEndpoints.DefaultHostMap
-            : stored.FrontingHostMap;
+        _frontingHostMap = ResolveFrontingHostMap(stored.FrontingHostMap);
         _autoFallback = stored.AutoFallback;
+
+        // 旧默认值被自动升级时顺手落盘，设置页里也能看到新的 IP
+        if (!string.IsNullOrWhiteSpace(stored.FrontingHostMap) &&
+            !string.Equals(_frontingHostMap, stored.FrontingHostMap, StringComparison.Ordinal))
+        {
+            Persist();
+        }
     }
+
+    /// <summary>
+    /// 空值用新默认；如果是 1.1.0 早期那份会把 www 指到源站、导致 403 的默认值，
+    /// 也自动换成新默认（用户自己改过的内容原样保留）。
+    /// </summary>
+    private static string ResolveFrontingHostMap(string? stored)
+    {
+        if (string.IsNullOrWhiteSpace(stored))
+        {
+            return PixivEndpoints.DefaultHostMap;
+        }
+
+        return NormalizeHostMap(stored) == NormalizeHostMap(PixivEndpoints.LegacyDefaultHostMap)
+            ? PixivEndpoints.DefaultHostMap
+            : stored;
+    }
+
+    private static string NormalizeHostMap(string text)
+        => string.Join(
+            ";",
+            text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim())
+                .Where(line => line.Length > 0));
 
     /// <summary>
     /// Pixiv API 服务地址（用户自建）。软件不内置任何公共接口，
