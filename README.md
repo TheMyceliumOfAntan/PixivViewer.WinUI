@@ -5,10 +5,10 @@
 > 非官方客户端，仅供学习与技术交流，请遵守 Pixiv 用户协议。
 
 <p align="center">
-  <img src="docs/screenshots/01-home.png" width="49%" alt="首页推荐" />
-  <img src="docs/screenshots/02-detail.png" width="49%" alt="作品详情" />
-  <img src="docs/screenshots/03-search.png" width="49%" alt="中文标签搜索候选" />
-  <img src="docs/screenshots/04-ranking.png" width="49%" alt="排行榜" />
+  <img src="docs/screenshots/01-home.jpg" width="49%" alt="首页推荐" />
+  <img src="docs/screenshots/02-detail.jpg" width="49%" alt="作品详情" />
+  <img src="docs/screenshots/03-search.jpg" width="49%" alt="中文标签搜索候选" />
+  <img src="docs/screenshots/04-ranking.jpg" width="49%" alt="排行榜" />
 </p>
 
 ---
