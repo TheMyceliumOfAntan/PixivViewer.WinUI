@@ -46,6 +46,18 @@
       WindowsAppSDKSelfContained=true 鑷甫 Windows App SDK 杩愯鏃讹紝鐢ㄦ埛鏃犻渶瀹夎
       SelfContained=true             鑷甫 .NET 杩愯鏃?
   -->
+  <!--
+    Debug 直接 F5 也走「未打包 + 自带 Windows App SDK 运行时」。
+    否则 VS 默认不传 WindowsPackageType，未注册 WinAppSDK 运行时的机器会在
+    Application.Start 抛 REGDB_E_CLASSNOTREG(0x80040154)。
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' and '$(WindowsPackageType)' == ''">
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- 自带 WinAppSDK 运行时必须知道具体架构；AnyCPU 时按 x64 处理 -->
+    <RuntimeIdentifier Condition="'$(Platform)' == 'AnyCPU' and '$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(WindowsPackageType)' == 'None'">
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
   </PropertyGroup>
