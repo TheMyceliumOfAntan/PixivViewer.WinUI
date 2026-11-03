@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
@@ -11,12 +12,14 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
 using Pixiv_Viewer_WinUI.Controls;
 using Pixiv_Viewer_WinUI.Helpers;
 using Pixiv_Viewer_WinUI.Models;
 using Microsoft.UI.Text;
 using Pixiv_Viewer_WinUI.Services;
+using Pixiv_Viewer_WinUI.Services.Manga;
 using Pixiv_Viewer_WinUI.Services.Pixiv;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
@@ -41,6 +44,18 @@ public sealed partial class IllustrationDetailPage : Page
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _hintTimer;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _zoomBarTimer;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _imageTimeout;
+
+    // ---- 漫画翻译 ----
+    private MangaPageResult? _mangaResult;
+    private CancellationTokenSource? _mangaCts;
+    private bool _showMangaTranslated = true;
+    private bool _mangaBusy;
+
+    /// <summary>译文应用的版本号：翻页/新结果会 +1，避免解码慢导致把上一页的译图画到当前页。</summary>
+    private int _mangaApplyVersion;
+
+    /// <summary>当前去字模式（设置页可切换）。</summary>
+    private static MangaInpaintMode CurrentInpaintMode => AppServices.Settings.MangaInpaintMode;
 
     public IllustrationDetailViewModel View { get; } = new();
 
@@ -95,6 +110,7 @@ public sealed partial class IllustrationDetailPage : Page
         {
             FullScreenHost.Width = Math.Max(0, e.NewSize.Width);
             FullScreenHost.Height = Math.Max(0, e.NewSize.Height);
+            UpdateFullScreenMangaStage();
         };
     }
 
@@ -116,6 +132,7 @@ public sealed partial class IllustrationDetailPage : Page
         ImageLoading.IsActive = false;
         ImageErrorText.Visibility = Visibility.Collapsed;
         _imageTimeout?.Stop();
+        UpdateMangaStage();
     }
 
     private void ShowZoomBar()
@@ -144,6 +161,8 @@ public sealed partial class IllustrationDetailPage : Page
             {
                 ThumbList.SelectedIndex = 0;
             }
+
+            MarkTranslatedPages();
 
             FollowLabel.Text = View.IsFollowed ? "已关注" : "关注";
             LinkText.Fill(DescriptionText, View.DescriptionDisplayText, TryNavigatePixivLink);
@@ -181,6 +200,7 @@ public sealed partial class IllustrationDetailPage : Page
 
                 _shownImageUrl = View.CurrentImageUrl;
                 BeginPageChange();
+                ResetMangaForCurrentPage();
                 break;
 
             case nameof(IllustrationDetailViewModel.IsFollowed):
@@ -199,11 +219,15 @@ public sealed partial class IllustrationDetailPage : Page
     {
         ImageHost.Width = Math.Max(0, e.NewSize.Width);
         ImageHost.Height = Math.Max(0, e.NewSize.Height);
+        UpdateMangaStage();
     }
 
     private void OnThumbSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_syncingThumb && ThumbList.SelectedIndex >= 0)
+        // 只响应用户点选：程序同步 SelectionIndex 时也会触发，重复跳转会打乱翻页顺序
+        if (!_syncingThumb &&
+            ThumbList.SelectedIndex >= 0 &&
+            ThumbList.SelectedIndex != View.CurrentIndex)
         {
             View.GoToPage(ThumbList.SelectedIndex);
         }
@@ -527,6 +551,7 @@ public sealed partial class IllustrationDetailPage : Page
             }
 
             FullScreenScroller.ChangeView(0, 0, 1f, true);
+            UpdateFullScreenMangaStage();
 
             // 把焦点交给页面，保证 Esc / F11 还能收到
             Focus(FocusState.Programmatic);
@@ -1373,6 +1398,682 @@ public sealed partial class IllustrationDetailPage : Page
     }
 
     private void OnReportClick(object sender, RoutedEventArgs e) => ShowHint("举报功能待接入");
+
+    // ================= 漫画翻译 =================
+
+    private async void OnMangaTranslateButtonClick(SplitButton sender, SplitButtonClickEventArgs args)
+        => await TranslateMangaPageAsync(force: false);
+
+    private async void OnMangaTranslatePageClick(object sender, RoutedEventArgs e)
+        => await TranslateMangaPageAsync(force: false);
+
+    private async void OnMangaRetranslateClick(object sender, RoutedEventArgs e)
+        => await TranslateMangaPageAsync(force: true);
+
+    private async void OnMangaTranslateAllClick(object sender, RoutedEventArgs e)
+        => await TranslateMangaAllAsync();
+
+    private void OnMangaToggleOriginalClick(object sender, RoutedEventArgs e)
+    {
+        if (_mangaResult is null)
+        {
+            ShowHint("本页还没有译文");
+            return;
+        }
+
+        _showMangaTranslated = !_showMangaTranslated;
+        UpdateMangaLayerVisibility();
+        ShowHint(_showMangaTranslated ? "已切换到译文" : "已切换到原图");
+    }
+
+    private void OnMangaCancelClick(object sender, RoutedEventArgs e)
+    {
+        _mangaCts?.Cancel();
+        ShowHint("已取消");
+    }
+
+    /// <summary>取某一页的原图地址：原图 → large 预览 → 缩略图逐级兜底。</summary>
+    private string? MangaPageUrl(int index)
+    {
+        var item = View.Item;
+        if (item is null)
+        {
+            return null;
+        }
+
+        foreach (var list in new[] { item.OriginalUrls, item.PageUrls, item.PreviewUrls })
+        {
+            if (index < list.Count && !string.IsNullOrWhiteSpace(list[index]))
+            {
+                return list[index];
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>确保模型已下载；没有则弹窗询问并下载。</summary>
+    private async Task<bool> EnsureMangaModelsAsync()
+    {
+        if (MangaTranslationService.IsReady)
+        {
+            return true;
+        }
+
+        var megabytes = MangaTranslationService.ModelSize / 1024d / 1024d;
+        var partial = MangaTranslationService.PartialBytes;
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "需要下载漫画翻译模型",
+            Content = $"漫画翻译的识别与去字在本机进行，需要先下载模型（约 {megabytes:F0} MB）。\n" +
+                      (partial > 0 ? $"上次已下载 {Format.Bytes(partial)}，本次会继续。\n" : string.Empty) +
+                      $"\n保存位置：{MangaTranslationService.ModelDirectory}\n" +
+                      "只有识别出的文字会发给翻译服务，图片不会上传。",
+            PrimaryButtonText = partial > 0 ? "继续下载" : "下载",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return false;
+        }
+
+        ShowMangaBusy("下载模型…", 0, cancellable: true);
+        _mangaCts = new CancellationTokenSource();
+
+        try
+        {
+            var progress = new Progress<MangaProgress>(p => UpdateDownloadBusy(p));
+            var ok = await MangaTranslationService.EnsureModelsAsync(progress, _mangaCts.Token);
+            if (!ok)
+            {
+                ShowHint("模型下载失败，请检查网络后重试");
+            }
+
+            return ok;
+        }
+        catch (OperationCanceledException)
+        {
+            ShowHint("已取消下载");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            ShowHint("模型下载失败：" + ex.Message);
+            return false;
+        }
+        finally
+        {
+            HideMangaBusy();
+            _mangaCts = null;
+        }
+    }
+
+    private async Task TranslateMangaPageAsync(bool force)
+    {
+        if (_mangaBusy || View.Item is null)
+        {
+            return;
+        }
+
+        if (!await EnsureMangaModelsAsync())
+        {
+            return;
+        }
+
+        if (CurrentInpaintMode == MangaInpaintMode.Lama && !MangaTranslationService.IsLamaReady)
+        {
+            ShowHint("高精度去字模型未下载，本次使用快速模式（可在设置里下载）");
+        }
+
+        var illustId = View.Id;
+        var pageIndex = View.CurrentIndex;
+        var imageUrl = View.CurrentOriginalUrl;
+
+        if (force)
+        {
+            MangaCache.DeletePage(illustId, pageIndex);
+        }
+        else if (MangaTranslationService.TryGetCached(illustId, pageIndex, CurrentInpaintMode) is { } cached)
+        {
+            await ApplyMangaResultAsync(cached);
+            return;
+        }
+
+        ShowMangaBusy("准备中…", 0);
+        _mangaCts = new CancellationTokenSource();
+        var succeeded = false;
+
+        try
+        {
+            var progress = new Progress<MangaProgress>(p => UpdateMangaBusy(p.Stage, p.Fraction));
+            var result = await MangaTranslationService.TranslatePageAsync(
+                illustId,
+                pageIndex,
+                imageUrl,
+                CurrentInpaintMode,
+                progress,
+                _mangaCts.Token);
+
+            if (result is null)
+            {
+                ShowHint("翻译失败，可稍后重试");
+                return;
+            }
+
+            if (View.CurrentIndex == pageIndex && View.Id == illustId)
+            {
+                await ApplyMangaResultAsync(result);
+            }
+
+            MarkPageTranslated(illustId, pageIndex);
+            succeeded = true;
+            ShowHint($"已翻译 {result.Regions.Count} 处文字");
+        }
+        catch (OperationCanceledException)
+        {
+            ShowHint("已取消");
+        }
+        catch (Exception ex)
+        {
+            ShowHint("翻译失败：" + ex.Message);
+        }
+        finally
+        {
+            HideMangaBusy();
+            _mangaCts = null;
+
+            if (!succeeded)
+            {
+                // 保持原状态
+            }
+        }
+    }
+
+    private async Task TranslateMangaAllAsync()
+    {
+        if (_mangaBusy || View.Item is null || View.PageCount <= 1)
+        {
+            if (View.PageCount <= 1)
+            {
+                await TranslateMangaPageAsync(force: false);
+            }
+
+            return;
+        }
+
+        if (!await EnsureMangaModelsAsync())
+        {
+            return;
+        }
+
+        var illustId = View.Id;
+        var total = View.PageCount;
+        var done = 0;
+        var failed = 0;
+
+        ShowMangaBusy($"翻译中… 0/{total}", 0, cancellable: true);
+        _mangaCts = new CancellationTokenSource();
+
+        try
+        {
+            for (var i = 0; i < total; i++)
+            {
+                _mangaCts.Token.ThrowIfCancellationRequested();
+
+                var url = MangaPageUrl(i);
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    failed++;
+                    done++;
+                    PixivDiagnostics.Write($"manga batch: page {i + 1} no url");
+                    continue;
+                }
+
+                var pageIndex = i;
+                UpdateMangaBusy($"翻译中… {done + 1}/{total}", (double)done / total);
+
+                var progress = new Progress<MangaProgress>(p =>
+                    UpdateMangaBusy($"第 {pageIndex + 1} 页 · {p.Stage}", (done + p.Fraction) / total));
+
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                MangaPageResult? result = null;
+
+                try
+                {
+                    result = await MangaTranslationService.TranslatePageAsync(
+                        illustId,
+                        i,
+                        url,
+                        CurrentInpaintMode,
+                        progress,
+                        _mangaCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // 单页失败不能中断整篇
+                    PixivDiagnostics.Write($"manga batch: page {i + 1} EX {ex.GetType().Name}: {ex.Message}");
+                }
+
+                PixivDiagnostics.Write(
+                    $"manga batch: page {i + 1} {(result is null ? "FAILED" : $"ok regions={result.Regions.Count}")} " +
+                    $"{watch.ElapsedMilliseconds}ms url={(url.Length > 60 ? url[..60] : url)}");
+
+                done++;
+
+                if (result is not null && View.CurrentIndex == i && View.Id == illustId)
+                {
+                    await ApplyMangaResultAsync(result);
+                }
+
+                if (result is not null)
+                {
+                    MarkPageTranslated(illustId, i);
+                }
+                else
+                {
+                    failed++;
+                }
+
+                UpdateMangaBusy($"翻译中… {done}/{total}", (double)done / total);
+            }
+
+            ShowHint(failed == 0
+                ? $"整篇翻译完成（{total} 页）"
+                : $"整篇完成，{total - failed}/{total} 页成功（{failed} 页图片获取失败，可稍后重试）");
+        }
+        catch (OperationCanceledException)
+        {
+            ShowHint($"已取消，完成 {done}/{total} 页");
+        }
+        catch (Exception ex)
+        {
+            ShowHint("批量翻译失败：" + ex.Message);
+        }
+        finally
+        {
+            HideMangaBusy();
+            _mangaCts = null;
+        }
+    }
+
+    private async Task ApplyMangaResultAsync(MangaPageResult result)
+    {
+        var version = ++_mangaApplyVersion;
+        var illustId = result.IllustId;
+        var pageIndex = result.PageIndex;
+
+        var bytes = result.Png ?? MangaTranslationService.ReadCachedImage(result);
+        if (bytes is null)
+        {
+            ShowHint("译图丢失，请重新翻译");
+            return;
+        }
+
+        var bitmap = await DecodeImageAsync(bytes, 1200);
+        if (bitmap is null)
+        {
+            ShowHint("译图解码失败");
+            return;
+        }
+
+        // 解码期间用户可能已经翻页，或者有更新的结果；此时把这次的丢掉，避免画错页
+        if (version != _mangaApplyVersion || View.Id != illustId || View.CurrentIndex != pageIndex)
+        {
+            return;
+        }
+
+        _mangaResult = result;
+        TranslatedImage.Source = bitmap;
+        UpdateMangaStage();
+        UpdateMangaLayerVisibility();
+    }
+
+    private void ResetMangaForCurrentPage()
+    {
+        // 让还在解码中的旧结果失效
+        _mangaApplyVersion++;
+
+        _mangaResult = null;
+        TranslatedImage.Source = null;
+        MangaOverlay.Children.Clear();
+        _showMangaTranslated = true;
+        UpdateMangaLayerVisibility();
+
+        if (MangaTranslationService.IsReady && View.Item is not null)
+        {
+            _ = LoadCachedMangaAsync(View.Id, View.CurrentIndex);
+        }
+    }
+
+    private async Task LoadCachedMangaAsync(string illustId, int pageIndex)
+    {
+        await Task.Yield();
+
+        // 当前已经显示着同一页的译文，就不用再解一次图
+        if (_mangaResult is not null &&
+            _mangaResult.IllustId == illustId &&
+            _mangaResult.PageIndex == pageIndex &&
+            TranslatedImage.Source is not null)
+        {
+            return;
+        }
+
+        var cached = MangaTranslationService.TryGetCached(illustId, pageIndex, CurrentInpaintMode);
+        if (cached is null || View.Id != illustId || View.CurrentIndex != pageIndex)
+        {
+            return;
+        }
+
+        await ApplyMangaResultAsync(cached);
+    }
+
+    private void UpdateMangaLayerVisibility()
+    {
+        var show = _mangaResult is not null && _showMangaTranslated;
+        TranslatedImage.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        MangaOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        FullScreenTranslated.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        FullScreenMangaOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>全屏层与普通视图共用同一份译文，需要按全屏尺寸重算对齐。</summary>
+    private void UpdateFullScreenMangaStage()
+    {
+        var hostWidth = FullScreenHost.ActualWidth;
+        var hostHeight = FullScreenHost.ActualHeight;
+        if (hostWidth <= 1 || hostHeight <= 1)
+        {
+            return;
+        }
+
+        var (imageWidth, imageHeight) = GetCurrentImageSize();
+        if (imageWidth <= 0 || imageHeight <= 0)
+        {
+            return;
+        }
+
+        var scale = Math.Min(hostWidth / imageWidth, hostHeight / imageHeight);
+        var stageWidth = Math.Max(1, imageWidth * scale);
+        var stageHeight = Math.Max(1, imageHeight * scale);
+
+        FullScreenStage.Width = stageWidth;
+        FullScreenStage.Height = stageHeight;
+        FullScreenMangaOverlay.Width = stageWidth;
+        FullScreenMangaOverlay.Height = stageHeight;
+        FullScreenTranslated.Source = TranslatedImage.Source;
+
+        BuildMangaOverlayInto(FullScreenMangaOverlay, stageWidth, stageHeight);
+    }
+
+    /// <summary>刷新缩略图上的「译」角标（只查文件是否存在，不读 JSON）。</summary>
+    private void MarkTranslatedPages()
+    {
+        if (!MangaTranslationService.IsReady)
+        {
+            return;
+        }
+
+        var illustId = View.Id;
+        foreach (var page in View.Pages)
+        {
+            page.IsTranslated = MangaTranslationService.HasCached(illustId, page.Index, CurrentInpaintMode);
+        }
+    }
+
+    /// <summary>标记单页已翻译（缩略图角标）。</summary>
+    private void MarkPageTranslated(string illustId, int pageIndex)
+    {
+        if (View.Id != illustId || pageIndex < 0 || pageIndex >= View.Pages.Count)
+        {
+            return;
+        }
+
+        View.Pages[pageIndex].IsTranslated = true;
+    }
+
+    /// <summary>按图片比例计算图片实际显示区域，让叠层与图片严格对齐。</summary>
+    private void UpdateMangaStage()
+    {
+        var hostWidth = ImageHost.ActualWidth;
+        var hostHeight = ImageHost.ActualHeight;
+        if (hostWidth <= 1 || hostHeight <= 1)
+        {
+            return;
+        }
+
+        var (imageWidth, imageHeight) = GetCurrentImageSize();
+        if (imageWidth <= 0 || imageHeight <= 0)
+        {
+            return;
+        }
+
+        var scale = Math.Min(hostWidth / imageWidth, hostHeight / imageHeight);
+        var stageWidth = Math.Max(1, imageWidth * scale);
+        var stageHeight = Math.Max(1, imageHeight * scale);
+
+        ImageStage.Width = stageWidth;
+        ImageStage.Height = stageHeight;
+        MangaOverlay.Width = stageWidth;
+        MangaOverlay.Height = stageHeight;
+
+        BuildMangaOverlay();
+    }
+
+    private (double Width, double Height) GetCurrentImageSize()
+    {
+        if (PageImage.Source is BitmapImage bitmap && bitmap.PixelWidth > 0)
+        {
+            return (bitmap.PixelWidth, bitmap.PixelHeight);
+        }
+
+        if (_mangaResult is not null && _mangaResult.Width > 0)
+        {
+            return (_mangaResult.Width, _mangaResult.Height);
+        }
+
+        return (0, 0);
+    }
+
+    /// <summary>把译文区域画到图片上：底色板 + 自动字号的中文。</summary>
+    private void BuildMangaOverlay()
+        => BuildMangaOverlayInto(MangaOverlay, ImageStage.Width, ImageStage.Height);
+
+    private void BuildMangaOverlayInto(Canvas canvas, double stageWidth, double stageHeight)
+    {
+        canvas.Children.Clear();
+
+        if (_mangaResult is null || stageWidth <= 1 || stageHeight <= 1)
+        {
+            return;
+        }
+
+        foreach (var region in _mangaResult.Regions)
+        {
+            if (string.IsNullOrWhiteSpace(region.Target))
+            {
+                continue;
+            }
+
+            // 排版用气泡区域（没有气泡信息时退回文字框）
+            var useArea = region.AreaW > 0 && region.AreaH > 0;
+            var left = (useArea ? region.AreaX : region.X) * stageWidth;
+            var top = (useArea ? region.AreaY : region.Y) * stageHeight;
+            var width = Math.Max(8, (useArea ? region.AreaW : region.W) * stageWidth);
+            var height = Math.Max(8, (useArea ? region.AreaH : region.H) * stageHeight);
+
+            var plateColor = ParseColor(region.PlateColor, Windows.UI.Color.FromArgb(255, 255, 255, 255));
+            var plate = new Border
+            {
+                Width = width,
+                Height = height,
+                CornerRadius = new CornerRadius(Math.Min(6, height * 0.12)),
+                Background = new SolidColorBrush(plateColor) { Opacity = 0.94 },
+            };
+
+            Canvas.SetLeft(plate, left);
+            Canvas.SetTop(plate, top);
+            canvas.Children.Add(plate);
+
+            var foreground = IsLight(plateColor)
+                ? Windows.UI.Color.FromArgb(255, 20, 20, 20)
+                : Windows.UI.Color.FromArgb(255, 245, 245, 245);
+
+            var text = new TextBlock
+            {
+                Text = region.Target,
+                Width = width * 0.92,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                TextAlignment = TextAlignment.Center,
+                Foreground = new SolidColorBrush(foreground),
+            };
+
+            // 先挂到画布再测量，避免脱离可视化树时 DesiredSize 不可靠
+            canvas.Children.Add(text);
+            var fontSize = FitFontSize(text, width * 0.92, height * 0.92);
+
+            // 字号封顶：不超过原文字号太多，避免短译文被放大到糊满整格。
+            // 竖排行框的「高度」是整列长度，字号应该用粗细（min(w,h)）来估。
+            if (region.Lines.Count > 0)
+            {
+                var thickness = region.Lines
+                    .Select(l => Math.Min(l.W, l.H))
+                    .OrderBy(v => v)
+                    .ElementAt(region.Lines.Count / 2);
+                var cap = thickness * stageHeight * 1.15;
+                fontSize = Math.Min(fontSize, Math.Max(9, cap));
+            }
+
+            text.FontSize = fontSize;
+            text.Measure(new Size(text.Width, double.PositiveInfinity));
+
+            var textHeight = Math.Min(height, Math.Max(1, text.DesiredSize.Height));
+            Canvas.SetLeft(text, left + width * 0.04);
+            Canvas.SetTop(text, top + Math.Max(0, (height - textHeight) / 2));
+        }
+    }
+
+    /// <summary>二分查找能放进框里的最大字号（元素需已挂到可视化树）。</summary>
+    private static double FitFontSize(TextBlock probe, double width, double height)
+    {
+        if (width <= 2 || height <= 2)
+        {
+            return 6;
+        }
+
+        double low = 6;
+        double high = Math.Clamp(height, 7, 64);
+        var best = low;
+
+        for (var i = 0; i < 8; i++)
+        {
+            var mid = (low + high) / 2;
+            probe.FontSize = mid;
+            probe.Measure(new Size(width, double.PositiveInfinity));
+            if (probe.DesiredSize.Height <= height)
+            {
+                best = mid;
+                low = mid;
+            }
+            else
+            {
+                high = mid;
+            }
+        }
+
+        return best;
+    }
+
+    private static Windows.UI.Color ParseColor(string value, Windows.UI.Color fallback)
+    {
+        try
+        {
+            if (value.Length == 7 && value[0] == '#')
+            {
+                var r = Convert.ToByte(value.Substring(1, 2), 16);
+                var g = Convert.ToByte(value.Substring(3, 2), 16);
+                var b = Convert.ToByte(value.Substring(5, 2), 16);
+                return Windows.UI.Color.FromArgb(255, r, g, b);
+            }
+        }
+        catch (Exception)
+        {
+            // 退回默认色
+        }
+
+        return fallback;
+    }
+
+    private static bool IsLight(Windows.UI.Color color)
+        => (0.299 * color.R + 0.587 * color.G + 0.114 * color.B) / 255 > 0.6;
+
+    private static async Task<BitmapImage?> DecodeImageAsync(byte[] bytes, int decodeWidth)
+    {
+        try
+        {
+            using var stream = new InMemoryRandomAccessStream();
+            using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
+            {
+                writer.WriteBytes(bytes);
+                await writer.StoreAsync();
+                writer.DetachStream();
+            }
+
+            stream.Seek(0);
+            var image = new BitmapImage
+            {
+                DecodePixelType = DecodePixelType.Logical,
+                DecodePixelWidth = decodeWidth,
+            };
+
+            await image.SetSourceAsync(stream);
+            return image;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private void ShowMangaBusy(string message, double _ = 0, bool cancellable = false)
+    {
+        _mangaBusy = true;
+        MangaBusyText.Text = message;
+        MangaCancelButton.Visibility = cancellable ? Visibility.Visible : Visibility.Collapsed;
+        MangaBusy.Visibility = Visibility.Visible;
+    }
+
+    private void UpdateMangaBusy(string stage, double fraction)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            MangaBusyText.Text = fraction > 0 ? $"{stage} {fraction * 100:F0}%" : stage;
+        });
+    }
+
+    /// <summary>下载模型时的进度文案（带 MB 与速度），供忙碌条复用。</summary>
+    private void UpdateDownloadBusy(MangaProgress progress)
+    {
+        var text = progress.TotalBytes > 0
+            ? $"{progress.Stage} · {progress.ReceivedBytes / 1024d / 1024d:F1}/{progress.TotalBytes / 1024d / 1024d:F1} MB" +
+              $" · {progress.Fraction * 100:F0}%"
+            : progress.Stage;
+        DispatcherQueue.TryEnqueue(() => MangaBusyText.Text = text);
+    }
+
+    private void HideMangaBusy()
+    {
+        _mangaBusy = false;
+        MangaBusy.Visibility = Visibility.Collapsed;
+        MangaCancelButton.Visibility = Visibility.Collapsed;
+    }
 
     private void ShowHint(string message)
     {

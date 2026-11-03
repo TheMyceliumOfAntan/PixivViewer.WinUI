@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="Pixiv_Viewer_WinUI.Views.IllustrationDetailPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -131,6 +131,33 @@
                         </StackPanel>
                     </SplitButton>
 
+                    <SplitButton
+                        x:Name="MangaTranslateButton"
+                        Click="OnMangaTranslateButtonClick"
+                        ToolTipService.ToolTip="漫画翻译（本地识别，只把文字发给翻译服务）">
+                        <SplitButton.Flyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Click="OnMangaTranslatePageClick" Text="翻译本页">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE8C1;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem Click="OnMangaTranslateAllClick" Text="翻译整篇">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE8F1;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Click="OnMangaToggleOriginalClick" Text="显示原图 / 译文" />
+                                <MenuFlyoutItem Click="OnMangaRetranslateClick" Text="重新翻译本页" />
+                            </MenuFlyout>
+                        </SplitButton.Flyout>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontSize="14" Glyph="&#xE8C1;" />
+                            <TextBlock Text="翻译" />
+                        </StackPanel>
+                    </SplitButton>
+
                     <Button Click="OnDownloadClick" ToolTipService.ToolTip="下载">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <FontIcon FontSize="14" Glyph="&#xE896;" />
@@ -214,25 +241,45 @@
                                             <FontIcon Glyph="&#xE740;" />
                                         </MenuFlyoutItem.Icon>
                                     </MenuFlyoutItem>
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Click="OnMangaTranslatePageClick" Text="翻译本页" />
+                                    <MenuFlyoutItem Click="OnMangaTranslateAllClick" Text="翻译整篇" />
+                                    <MenuFlyoutItem Click="OnMangaToggleOriginalClick" Text="显示原图 / 译文" />
                                 </MenuFlyout>
                             </Grid.ContextFlyout>
 
                             <!--  骨架：图片加载完成前显示  -->
                             <Rectangle x:Name="ImageSkeleton" Fill="{ThemeResource SkeletonFillBrush}" />
 
-                            <Image
-                                x:Name="PageImage"
-                                controls:CachedImage.DecodeWidth="1200"
-                                controls:CachedImage.HighQualityUrl="{x:Bind View.CurrentOriginalUrl, Mode=OneWay}"
-                                controls:CachedImage.Url="{x:Bind View.CurrentImageUrl, Mode=OneWay}"
-                                ImageFailed="OnPageImageFailed"
-                                ImageOpened="OnPageImageOpened"
-                                Opacity="0"
-                                Stretch="Uniform">
-                                <Image.OpacityTransition>
-                                    <ScalarTransition Duration="0:0:0.2" />
-                                </Image.OpacityTransition>
-                            </Image>
+                            <Grid
+                                x:Name="ImageStage"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                                <Image
+                                    x:Name="PageImage"
+                                    controls:CachedImage.DecodeWidth="1200"
+                                    controls:CachedImage.HighQualityUrl="{x:Bind View.CurrentOriginalUrl, Mode=OneWay}"
+                                    controls:CachedImage.Url="{x:Bind View.CurrentImageUrl, Mode=OneWay}"
+                                    ImageFailed="OnPageImageFailed"
+                                    ImageOpened="OnPageImageOpened"
+                                    Opacity="0"
+                                    Stretch="Uniform">
+                                    <Image.OpacityTransition>
+                                        <ScalarTransition Duration="0:0:0.2" />
+                                    </Image.OpacityTransition>
+                                </Image>
+
+                                <!--  译图（已擦除原文）+ 译文叠层  -->
+                                <Image
+                                    x:Name="TranslatedImage"
+                                    Stretch="Uniform"
+                                    Visibility="Collapsed" />
+
+                                <Canvas
+                                    x:Name="MangaOverlay"
+                                    IsHitTestVisible="False"
+                                    Visibility="Collapsed" />
+                            </Grid>
 
                             <ProgressRing
                                 x:Name="ImageLoading"
@@ -241,6 +288,38 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 IsActive="False" />
+
+                            <!--  漫画翻译进度  -->
+                            <Border
+                                x:Name="MangaBusy"
+                                Margin="0,0,0,20"
+                                Padding="14,10"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Bottom"
+                                Background="#CC000000"
+                                CornerRadius="10"
+                                Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <ProgressRing
+                                        x:Name="MangaBusyRing"
+                                        Width="18"
+                                        Height="18"
+                                        IsActive="True" />
+                                    <TextBlock
+                                        x:Name="MangaBusyText"
+                                        VerticalAlignment="Center"
+                                        FontSize="12"
+                                        Foreground="White"
+                                        Text="准备中…" />
+                                    <Button
+                                        x:Name="MangaCancelButton"
+                                        Padding="8,2"
+                                        Click="OnMangaCancelClick"
+                                        Content="取消"
+                                        FontSize="12"
+                                        Visibility="Collapsed" />
+                                </StackPanel>
+                            </Border>
 
                             <TextBlock
                                 x:Name="ImageErrorText"
@@ -519,6 +598,21 @@
                                             FontSize="10"
                                             Foreground="White"
                                             Text="{x:Bind Caption}" />
+                                    </Border>
+
+                                    <!--  已翻译标记  -->
+                                    <Border
+                                        Margin="2"
+                                        Padding="4,0"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Top"
+                                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                        CornerRadius="4"
+                                        Visibility="{x:Bind IsTranslated, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock
+                                            FontSize="9"
+                                            Foreground="White"
+                                            Text="译" />
                                     </Border>
                                 </Grid>
                             </DataTemplate>
@@ -951,11 +1045,25 @@
                 VerticalScrollMode="Enabled"
                 ZoomMode="Enabled">
                 <Grid x:Name="FullScreenHost">
-                    <Image
-                        controls:CachedImage.DecodeWidth="2000"
-                        controls:CachedImage.HighQualityUrl="{x:Bind View.CurrentOriginalUrl, Mode=OneWay}"
-                        controls:CachedImage.Url="{x:Bind View.CurrentImageUrl, Mode=OneWay}"
-                        Stretch="Uniform" />
+                    <Grid
+                        x:Name="FullScreenStage"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                        <Image
+                            x:Name="FullScreenImage"
+                            controls:CachedImage.DecodeWidth="2000"
+                            controls:CachedImage.HighQualityUrl="{x:Bind View.CurrentOriginalUrl, Mode=OneWay}"
+                            controls:CachedImage.Url="{x:Bind View.CurrentImageUrl, Mode=OneWay}"
+                            Stretch="Uniform" />
+                        <Image
+                            x:Name="FullScreenTranslated"
+                            Stretch="Uniform"
+                            Visibility="Collapsed" />
+                        <Canvas
+                            x:Name="FullScreenMangaOverlay"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed" />
+                    </Grid>
                 </Grid>
             </ScrollViewer>
 

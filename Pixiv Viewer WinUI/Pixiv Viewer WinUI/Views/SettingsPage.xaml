@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="Pixiv_Viewer_WinUI.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -266,6 +266,167 @@
                     </Grid>
                 </Border>
     
+                <!--  漫画翻译  -->
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource SectionHeaderTextBlockStyle}"
+                    Text="漫画翻译" />
+
+                <Border Style="{StaticResource SurfaceCardStyle}">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="翻译模型" />
+                                <TextBlock
+                                    x:Name="MangaModelStatusText"
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="检查中…"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Name="MangaModelPathText"
+                                    IsTextSelectionEnabled="True"
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <Button
+                                    x:Name="MangaOpenFolderButton"
+                                    Click="OnMangaOpenFolderClick"
+                                    Content="打开文件夹" />
+                                <Button
+                                    x:Name="MangaDownloadButton"
+                                    Click="OnMangaDownloadClick"
+                                    Content="下载" />
+                                <Button
+                                    x:Name="MangaDeleteButton"
+                                    Click="OnMangaDeleteClick"
+                                    Content="删除" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel
+                            x:Name="MangaDownloadPanel"
+                            Spacing="6"
+                            Visibility="Collapsed">
+                            <ProgressBar
+                                x:Name="MangaDownloadBar"
+                                Height="6"
+                                Maximum="1"
+                                Value="0" />
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    x:Name="MangaDownloadDetailText"
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="准备中…"
+                                    TextWrapping="Wrap" />
+                                <Button
+                                    x:Name="MangaDownloadCancelButton"
+                                    Grid.Column="1"
+                                    Padding="12,2"
+                                    Click="OnMangaDownloadCancelClick"
+                                    Content="取消" />
+                            </Grid>
+                        </StackPanel>
+
+                        <Grid
+                            MinHeight="44"
+                            Margin="0,2"
+                            ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock FontSize="14" Text="GPU 加速（DirectML）" />
+                                <TextBlock
+                                    x:Name="MangaGpuHint"
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="检测与识别优先用显卡；去字会在支持时自动走 GPU"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch
+                                x:Name="MangaGpuSwitch"
+                                Grid.Column="1"
+                                MinWidth="0"
+                                Padding="0"
+                                VerticalAlignment="Center"
+                                OffContent=""
+                                OnContent=""
+                                Toggled="OnMangaGpuToggled" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="去字模式" />
+                                <TextBlock
+                                    x:Name="MangaInpaintHint"
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="快速：纯色填充 + 扩散，不额外耗时"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <ComboBox
+                                    x:Name="MangaInpaintBox"
+                                    MinWidth="160"
+                                    SelectionChanged="OnMangaInpaintModeChanged">
+                                    <ComboBoxItem Content="快速（内置）" />
+                                    <ComboBoxItem Content="高精度（LaMa）" />
+                                </ComboBox>
+                                <Button
+                                    x:Name="MangaLamaDownloadButton"
+                                    Click="OnMangaLamaDownloadClick"
+                                    Content="下载高精度模型" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock FontSize="14" Text="译文缓存" />
+                                <TextBlock
+                                    x:Name="MangaCacheText"
+                                    Style="{StaticResource MetaTextBlockStyle}"
+                                    Text="译文图片与文字区域" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Click="OnClearMangaCacheClick"
+                                Content="清空" />
+                        </Grid>
+
+                        <TextBlock
+                            Style="{StaticResource MetaTextBlockStyle}"
+                            Text="识别与去字全部在本机完成，只有识别出的文字会发给翻译服务。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
                 <!--  下载  -->
                 <TextBlock
                     Margin="0,8,0,0"
@@ -564,7 +725,13 @@
                         <TextBlock
                             Margin="0,10,0,0"
                             Style="{StaticResource MetaTextBlockStyle}"
-                            Text="域前置直连的默认服务器 IP 与实现思路参考自开源项目 Pixeval（GPL-3.0），在此致谢。"
+                            Text="域前置直连的默认服务器 IP、TLS ClientHello 分片、WebView2 代理登录的实现思路参考自 Pixeval（GPL-3.0）。"
+                            TextWrapping="Wrap" />
+
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            Style="{StaticResource MetaTextBlockStyle}"
+                            Text="漫画翻译：comictextdetector（GPL-3.0，manga-image-translator）、PP-OCRv6（Apache-2.0，PaddleOCR）、LaMa（Apache-2.0，Carve/LaMa-ONNX）；推理由 ONNX Runtime（MIT）驱动；流水线思路参考 ShinobuTranslator（GPL-3.0）；文本翻译使用 B 站 Index-Translate 与 MyMemory。"
                             TextWrapping="Wrap" />
     
                         <Rectangle

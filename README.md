@@ -56,6 +56,18 @@
 - 作品说明、评论都支持「翻译 / 显示原文」切换
 - 优先使用 B 站 Index-Translate 免费接口，失败自动回退 MyMemory
 
+### 漫画翻译
+
+- 详情页工具栏「翻译」：翻译本页 / 翻译整篇，图片右键菜单同样可以触发
+- **识别与去字全在本机**（ONNX 模型），只有识别出的日文文字会发给翻译服务，图片不上传
+- 译文叠在擦除原文后的图上，可一键「显示原图 / 译文」来回切换，全屏查看同样显示译文
+- 整篇翻译带进度与取消，结果按「作品 + 页码」缓存，缩略图上的「译」角标表示该页已翻译
+- 首次使用需下载约 171 MB 基础模型：设置 → 漫画翻译 → 下载（带 SHA-256 校验，多源重试）
+- 去字有两种模式：快速（纯色填充，内置）与高精度（LaMa 神经修复，另需 208 MB），可在设置里切换
+- **GPU 加速（默认开启）**：检测与识别走 DirectML；高精度去字在检测到 DML 版模型时同样走 GPU，否则自动回落 CPU
+- 高精度去字只处理「复杂背景」的气泡，纯色气泡交给经典算法 —— 常见的白底对白页几乎不产生 GPU/CPU 开销
+- 有支持 DX12 的显卡时检测与识别自动用 DirectML 加速，否则回落到 CPU（慢 3~5 倍）
+
 ### 下载
 
 - 一键下载原图，支持批量任务队列
@@ -151,8 +163,12 @@ Pixiv 会阶段性限制评论接口，程序会自动重试备用的读取方�
 ## 致谢
 
 - [TheMyceliumOfAntan/pixiv-proxy-api](https://github.com/TheMyceliumOfAntan/pixiv-proxy-api) —— 本项目使用的 Pixiv API 服务
-- [Pixeval/Pixeval](https://github.com/Pixeval/Pixeval)（GPL-3.0）—— 域前置直连的默认服务器 IP 与实现思路参考
+- [Pixeval/Pixeval](https://github.com/Pixeval/Pixeval)（GPL-3.0）—— 域前置直连的默认服务器 IP、TLS ClientHello 分片、WebView2 代理登录的实现思路参考
 - [bilibili/Index-Translate](https://github.com/bilibili/Index-Translate) —— 免费翻译接口
+- [zyddnys/manga-image-translator](https://github.com/zyddnys/manga-image-translator) —— 漫画文本检测模型（comictextdetector，GPL-3.0）
+- [PaddlePaddle/PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) —— PP-OCRv6 日文识别模型（Apache-2.0）
+- [DonutShinobu/ShinobuTranslator](https://github.com/DonutShinobu/ShinobuTranslator) —— 漫画翻译流水线思路参考
+- [Carve/LaMa-ONNX](https://huggingface.co/Carve/LaMa-ONNX) —— LaMa 去字模型；DirectML 兼容改写脚本参考 [onnxruntime#33549](https://github.com/microsoft/onnxruntime/issues/33549)
 - [upbit/pixivpy](https://github.com/upbit/pixivpy) —— App API 端点参考
 
 ## 许可证

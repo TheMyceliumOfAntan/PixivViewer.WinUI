@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net.Http;
 using Microsoft.UI.Xaml;
 using Pixiv_Viewer_WinUI.Helpers;
+using Pixiv_Viewer_WinUI.Services.Manga;
 using Pixiv_Viewer_WinUI.Services.Pixiv;
 
 namespace Pixiv_Viewer_WinUI.Services;
@@ -111,6 +112,8 @@ public sealed class AppSettings : ObservableObject
     private bool _autoCheckUpdate;
     private string _skippedUpdateVersion;
     private DateTimeOffset? _lastUpdateCheck;
+    private MangaInpaintMode _mangaInpaintMode;
+    private bool _mangaGpuEnabled = true;
 
     public AppSettings()
     {
@@ -124,6 +127,10 @@ public sealed class AppSettings : ObservableObject
         _autoFallback = stored.AutoFallback;
         _autoCheckUpdate = stored.AutoCheckUpdate;
         _skippedUpdateVersion = stored.SkippedUpdateVersion ?? string.Empty;
+        _mangaInpaintMode = string.Equals(stored.MangaInpaintMode, "lama", StringComparison.OrdinalIgnoreCase)
+            ? MangaInpaintMode.Lama
+            : MangaInpaintMode.Classic;
+        _mangaGpuEnabled = stored.MangaGpuEnabled;
         _lastUpdateCheck = DateTimeOffset.TryParse(stored.LastUpdateCheckUtc, out var lastCheck)
             ? lastCheck
             : null;
@@ -284,6 +291,32 @@ public sealed class AppSettings : ObservableObject
         }
     }
 
+    /// <summary>漫画去字模式（经典 / LaMa 高精度）。</summary>
+    public MangaInpaintMode MangaInpaintMode
+    {
+        get => _mangaInpaintMode;
+        set
+        {
+            if (SetProperty(ref _mangaInpaintMode, value))
+            {
+                Persist();
+            }
+        }
+    }
+
+    /// <summary>漫画翻译是否启用 GPU（DirectML）加速。</summary>
+    public bool MangaGpuEnabled
+    {
+        get => _mangaGpuEnabled;
+        set
+        {
+            if (SetProperty(ref _mangaGpuEnabled, value))
+            {
+                Persist();
+            }
+        }
+    }
+
     private void Persist()
     {
         SettingsStore.Save(new StoredSettings
@@ -295,6 +328,8 @@ public sealed class AppSettings : ObservableObject
             AutoCheckUpdate = _autoCheckUpdate,
             SkippedUpdateVersion = _skippedUpdateVersion,
             LastUpdateCheckUtc = _lastUpdateCheck?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+            MangaInpaintMode = _mangaInpaintMode == MangaInpaintMode.Lama ? "lama" : "classic",
+            MangaGpuEnabled = _mangaGpuEnabled,
         });
     }
 

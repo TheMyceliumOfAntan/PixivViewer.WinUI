@@ -169,9 +169,46 @@ public sealed partial class DownloadsPage : Page
 
     private void OnOpenClick(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is DownloadTask task)
+        if ((sender as FrameworkElement)?.Tag is not DownloadTask task)
         {
-            Subtitle.Text = $"待接入：打开 {task.TargetPath}";
+            return;
+        }
+
+        var path = task.TargetPath;
+        try
+        {
+            // 文件已存在：直接定位并选中
+            if (!string.IsNullOrWhiteSpace(path) && System.IO.File.Exists(path))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                    "explorer.exe",
+                    $"/select,\"{path}\"")
+                {
+                    UseShellExecute = true,
+                });
+                return;
+            }
+
+            // 还没下完 / 文件被移动：退到所在文件夹
+            var folder = string.IsNullOrWhiteSpace(path)
+                ? AppServices.Downloads.DownloadFolder
+                : System.IO.Path.GetDirectoryName(path);
+
+            if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", folder)
+                {
+                    UseShellExecute = true,
+                });
+                Subtitle.Text = "文件还没下载完，已打开它所在的文件夹";
+                return;
+            }
+
+            Subtitle.Text = "找不到文件，可能已被移动或删除";
+        }
+        catch (Exception ex)
+        {
+            Subtitle.Text = $"打开失败：{ex.Message}";
         }
     }
 
@@ -212,7 +249,7 @@ public sealed partial class DownloadsPage : Page
         var ok = await AppServices.Downloads.OpenDownloadFolderAsync();
         if (!ok)
         {
-            Subtitle.Text = "待接入：打开下载文件夹 D:\\Pixiv";
+            Subtitle.Text = $"打开下载文件夹失败：{AppServices.Downloads.DownloadFolder}";
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage.Streams;
@@ -63,6 +64,37 @@ public static class ImageCache
         catch (Exception)
         {
             // 文件被占用时忽略，下次再清。
+        }
+    }
+
+    /// <summary>读取原图字节：优先用磁盘缓存，避免为了翻译重复下载。</summary>
+    public static async Task<byte[]?> GetBytesAsync(string? url, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        var file = Path.Combine(Root, Hash(url) + ".img");
+        try
+        {
+            if (File.Exists(file) && new FileInfo(file).Length > 0)
+            {
+                return await File.ReadAllBytesAsync(file, cancellationToken);
+            }
+
+            Directory.CreateDirectory(Root);
+            var bytes = await Client.GetByteArrayAsync(url, cancellationToken);
+            await File.WriteAllBytesAsync(file, bytes, cancellationToken);
+            return bytes;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 

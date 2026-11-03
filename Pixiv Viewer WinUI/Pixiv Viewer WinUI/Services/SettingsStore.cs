@@ -26,6 +26,12 @@ internal sealed class StoredSettings
 
     /// <summary>上次检查更新的时间（ISO 8601），用于「每天最多查一次」。</summary>
     public string LastUpdateCheckUtc { get; set; } = string.Empty;
+
+    /// <summary>漫画去字模式：classic = 经典算法（默认）；lama = LaMa 神经修复（需另下模型）。</summary>
+    public string MangaInpaintMode { get; set; } = "classic";
+
+    /// <summary>漫画翻译是否启用 GPU（DirectML）加速；关闭后强制 CPU。</summary>
+    public bool MangaGpuEnabled { get; set; } = true;
 }
 
 /// <summary>
