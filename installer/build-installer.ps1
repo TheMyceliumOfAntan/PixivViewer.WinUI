@@ -3,7 +3,7 @@
 #        powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version 1.1.0
 
 param(
-    [string]$Version = "1.2.1",
+    [string]$Version = "1.2.2",
     [string]$Configuration = "Release",
     [string]$PublishDir = "D:\CSharp\Release\PixivViewer-win-x64",
     [string]$OutputDir = "D:\CSharp\Release"

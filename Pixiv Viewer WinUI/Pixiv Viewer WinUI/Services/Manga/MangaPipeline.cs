@@ -129,43 +129,19 @@ internal static class MangaPipeline
 
             var plate = MangaInpainter.SampleBorder(bitmap, (left, top, right - left, bottom - top));
 
-            // 排版区域优先用气泡包围盒（文字框太窄会把译文排成一字一行）。
-            // 同一气泡可能被文字切成多个白色连通域，取组内出现最多的那个。
-            var areaLeft = left;
-            var areaTop = top;
-            var areaRight = right;
-            var areaBottom = bottom;
-            var bubbleId = group
-                .Where(m => m.Bubble != 0)
-                .GroupBy(m => m.Bubble)
-                .OrderByDescending(g => g.Count())
-                .Select(g => g.Key)
-                .DefaultIfEmpty(0)
-                .First();
-
-            if (bubbleId != 0 && bubbleIds.Bounds.TryGetValue(bubbleId, out var bounds))
-            {
-                var sx = bitmap.Width / (double)MangaDetector.InputSize;
-                var sy = bitmap.Height / (double)MangaDetector.InputSize;
-                var bx = (int)(bounds.X * sx);
-                var by = (int)(bounds.Y * sy);
-                var bw = (int)(bounds.W * sx);
-                var bh = (int)(bounds.H * sy);
-                var textWidth = Math.Max(1, right - left);
-                var textHeight = Math.Max(1, bottom - top);
-
-                // 排版区域最多比文字框大 1.6×宽 / 1.35×高，并以文字为中心：
-                // 既能让竖排气泡有横向空间，又不会被整块白色面板撑满画面
-                var areaWidth = Math.Min(bw, (int)(textWidth * 1.6));
-                var areaHeight = Math.Min(bh, (int)(textHeight * 1.35));
-                var centerX = (left + right) / 2;
-                var centerY = (top + bottom) / 2;
-
-                areaLeft = Math.Max(0, centerX - areaWidth / 2);
-                areaTop = Math.Max(0, centerY - areaHeight / 2);
-                areaRight = Math.Min(bitmap.Width, areaLeft + areaWidth);
-                areaBottom = Math.Min(bitmap.Height, areaTop + areaHeight);
-            }
+            // 排版区域 = 原文字框 + 有限余量（宽 1.35×、高 1.15×），居中放置。
+            // 不借用气泡包围盒：整页白底 / 大面板会被误当成气泡，导致底板糊住整页。
+            var textWidth = Math.Max(1, right - left);
+            var textHeight = Math.Max(1, bottom - top);
+            var areaWidth = Math.Max(8, (int)(textWidth * 1.35));
+            var areaHeight = Math.Max(8, (int)(textHeight * 1.15));
+            var centerX = (left + right) / 2;
+            var centerY = (top + bottom) / 2;
+            var areaLeft = Math.Max(0, centerX - areaWidth / 2);
+            var areaTop = Math.Max(0, centerY - areaHeight / 2);
+            var areaRight = Math.Min(bitmap.Width, areaLeft + areaWidth);
+            var areaBottom = Math.Min(bitmap.Height, areaTop + areaHeight);
+            var bubbleId = PrimaryBubble(group);
 
             regions.Add(new MangaRegion
             {
@@ -300,7 +276,11 @@ internal static class MangaPipeline
             .OrderBy(v => v)
             .ElementAt(group.Count / 2);
 
-        var limit = Math.Max(60, thickness * 2.5);
+        // 竖排（多列并排）允许较大的横向间距；横排大多是并列的旁白框，只在极近时才合并
+        var verticalLines = group.Count(m => m.Box.H > m.Box.W * 1.2) >= group.Count / 2.0;
+        var limit = verticalLines
+            ? Math.Max(60, thickness * 2.5)
+            : Math.Max(24, thickness * 0.8);
         var visited = new bool[group.Count];
         var result = new List<List<(MangaLineBox Box, string Text, float Score, bool Vertical, int Bubble)>>();
 

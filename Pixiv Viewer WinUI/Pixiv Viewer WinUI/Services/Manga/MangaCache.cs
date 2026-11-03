@@ -91,7 +91,7 @@ internal sealed record MangaProgress(
 internal static class MangaCache
 {
     /// <summary>当前缓存结构版本（改了分组/排版逻辑就 +1）。</summary>
-    public const int SchemaVersion = 6;
+    public const int SchemaVersion = 7;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
