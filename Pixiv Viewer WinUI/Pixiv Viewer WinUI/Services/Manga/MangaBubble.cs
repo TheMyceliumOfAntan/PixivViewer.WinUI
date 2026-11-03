@@ -93,6 +93,9 @@ internal static class MangaBubble
     {
         bounds = new Dictionary<int, (int X, int Y, int W, int H)>();
 
+        // 超过整页 1/4 的浅色连通域视为页面背景，不当气泡
+        var backgroundLimit = (int)(Size * (long)Size * 0.25);
+
         var light = new bool[Size * Size];
         for (var y = 0; y < Size; y++)
         {
@@ -170,6 +173,17 @@ internal static class MangaBubble
                 foreach (var p in pixels)
                 {
                     labels[p] = 0;
+                    light[p] = false;   // 标记为已处理，避免外层扫描再次把它当成新区域
+                }
+            }
+            else if (area >= backgroundLimit)
+            {
+                // 整页白底也会连成一个巨大的连通域：它不是气泡，
+                // 否则同一页所有文字都会被归到同一个「气泡」里并排成一块
+                foreach (var p in pixels)
+                {
+                    labels[p] = 0;
+                    light[p] = false;
                 }
             }
             else

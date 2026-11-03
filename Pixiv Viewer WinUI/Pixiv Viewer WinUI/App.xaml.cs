@@ -83,6 +83,7 @@ namespace Pixiv_Viewer_WinUI
             _ = CheckUpdatesAsync();
         }
 
+
         /// <summary>开发自检：只跑模型下载（验证续传与进度回调），日志写到指定目录。</summary>
         private static async System.Threading.Tasks.Task RunMangaDownloadTestAsync(string outputDirectory, bool lamaOnly = false)
         {
@@ -93,7 +94,20 @@ namespace Pixiv_Viewer_WinUI
             {
                 lock (gate)
                 {
-                    notes.AppendLine($"[{System.DateTime.Now:HH:mm:ss}] {message}");
+                    var line = $"[{System.DateTime.Now:HH:mm:ss}] {message}";
+                    notes.AppendLine(line);
+
+                    // 立即落盘，进程被卡住时也能看到最后一步
+                    try
+                    {
+                        System.IO.File.AppendAllText(
+                            System.IO.Path.Combine(outputDirectory, "selftest.log"),
+                            line + System.Environment.NewLine);
+                    }
+                    catch (System.Exception)
+                    {
+                        // 忽略
+                    }
                 }
             }
 

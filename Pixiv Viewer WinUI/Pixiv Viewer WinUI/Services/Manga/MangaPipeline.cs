@@ -394,13 +394,21 @@ internal static class MangaPipeline
             {
                 for (var j = i + 1; j < groups.Count; j++)
                 {
+                    // 背景上的独立文字（气泡 id = 0）不按距离合并：那往往是并列的旁白框，
+                    // 合并会把整页文字揉成一段
+                    var bubbleI = PrimaryBubble(groups[i]);
+                    var bubbleJ = PrimaryBubble(groups[j]);
+                    if (bubbleI == 0 || bubbleJ == 0)
+                    {
+                        continue;
+                    }
+
                     if (OverlapRatio(AreaOf(groups[i], bounds), AreaOf(groups[j], bounds)) <= 0.35)
                     {
                         continue;
                     }
 
-                    // 包围盒重叠还不够：白色面板会把远处的标题也算进同一个连通域，
-                    // 必须再确认两组文字本身挨得够近
+                    // 包围盒重叠还不够：同一气泡可能被文字切成几块，但远处的标题不该被并进来
                     var thickness = Math.Max(
                         MedianThickness(groups[i]),
                         MedianThickness(groups[j]));
@@ -425,12 +433,7 @@ internal static class MangaPipeline
         List<(MangaLineBox Box, string Text, float Score, bool Vertical, int Bubble)> group,
         Dictionary<int, (int X, int Y, int W, int H)> bounds)
     {
-        var bubble = group.Where(m => m.Bubble != 0)
-            .GroupBy(m => m.Bubble)
-            .OrderByDescending(g => g.Count())
-            .Select(g => g.Key)
-            .DefaultIfEmpty(0)
-            .First();
+        var bubble = PrimaryBubble(group);
 
         if (bubble != 0 && bounds.TryGetValue(bubble, out var rect))
         {
@@ -443,6 +446,15 @@ internal static class MangaPipeline
         var bottom = group.Max(m => m.Box.Y + m.Box.H);
         return (left, top, right - left, bottom - top);
     }
+
+    /// <summary>组内出现最多的气泡编号（0 = 不在气泡里）。</summary>
+    private static int PrimaryBubble(List<(MangaLineBox Box, string Text, float Score, bool Vertical, int Bubble)> group)
+        => group.Where(m => m.Bubble != 0)
+            .GroupBy(m => m.Bubble)
+            .OrderByDescending(g => g.Count())
+            .Select(g => g.Key)
+            .DefaultIfEmpty(0)
+            .First();
 
     private static double OverlapRatio((int X, int Y, int W, int H) a, (int X, int Y, int W, int H) b)
     {
