@@ -201,12 +201,37 @@ internal static class MangaBubble
     /// </summary>
     public static List<(MangaLineBox Box, int Bubble)> MergeFragments(
         IReadOnlyList<MangaLineBox> boxes,
-        int[] bubbleIds)
+        int[] bubbleIds,
+        Dictionary<int, (int X, int Y, int W, int H)> bounds)
     {
         var merged = new List<(MangaLineBox Box, int Bubble)>(boxes.Count);
         for (var i = 0; i < boxes.Count; i++)
         {
             merged.Add((boxes[i], bubbleIds[i]));
+        }
+
+        // 气泡「紧凑度」：真实气泡的白色区域与文字面积相称；
+        // 整块白背景 / 大面板会远大于文字面积，这种区域里的多行文字不能合并
+        var compact = new Dictionary<int, bool>();
+        foreach (var id in bubbleIds.Where(id => id != 0).Distinct())
+        {
+            if (!bounds.TryGetValue(id, out var rect) || rect.W <= 0 || rect.H <= 0)
+            {
+                compact[id] = false;
+                continue;
+            }
+
+            var textArea = 0.0;
+            for (var i = 0; i < boxes.Count; i++)
+            {
+                if (bubbleIds[i] == id)
+                {
+                    textArea += boxes[i].W * (double)boxes[i].H;
+                }
+            }
+
+            var bubbleArea = rect.W * (double)rect.H;
+            compact[id] = textArea > 0 && bubbleArea <= textArea * 2.2;
         }
 
         var changed = true;
@@ -218,7 +243,14 @@ internal static class MangaBubble
             {
                 for (var j = i + 1; j < merged.Count; j++)
                 {
-                    if (merged[i].Bubble != merged[j].Bubble)
+                    // 只合并「同一气泡内」的碎片：
+                    // 背景上的旁白框常常上下紧挨且左右对齐，按 sameColumn 会被并成一整段
+                    if (merged[i].Bubble == 0 || merged[i].Bubble != merged[j].Bubble)
+                    {
+                        continue;
+                    }
+
+                    if (!compact.TryGetValue(merged[i].Bubble, out var isCompact) || !isCompact)
                     {
                         continue;
                     }

@@ -63,7 +63,7 @@ internal static class MangaPipeline
         progress?.Report(new MangaProgress("识别日文…", 0.25));
         var ocr = new MangaOcr(backend.Ocr, backend.Dict);
         var bubbleIds = MangaBubble.Assign(bitmap, candidates);
-        var merged = MangaBubble.MergeFragments(candidates, bubbleIds.Ids);
+        var merged = MangaBubble.MergeFragments(candidates, bubbleIds.Ids, bubbleIds.Bounds);
 
         var lines = new List<(MangaLineBox Box, string Text, float Score, bool Vertical, int Bubble)>(merged.Count);
         var lineNotes = new List<string>();
@@ -383,6 +383,11 @@ internal static class MangaPipeline
                         continue;
                     }
 
+                    if (!IsCompactBubble(bubbleI, groups, bounds))
+                    {
+                        continue;
+                    }
+
                     if (OverlapRatio(AreaOf(groups[i], bounds), AreaOf(groups[j], bounds)) <= 0.35)
                     {
                         continue;
@@ -407,6 +412,25 @@ internal static class MangaPipeline
         }
 
         return groups;
+    }
+
+    /// <summary>该气泡的白色区域是否与文字面积相称（真气泡）；否则视为大面板/背景。</summary>
+    private static bool IsCompactBubble(
+        int bubble,
+        List<List<(MangaLineBox Box, string Text, float Score, bool Vertical, int Bubble)>> groups,
+        Dictionary<int, (int X, int Y, int W, int H)> bounds)
+    {
+        if (bubble == 0 || !bounds.TryGetValue(bubble, out var rect) || rect.W <= 0 || rect.H <= 0)
+        {
+            return false;
+        }
+
+        var textArea = groups
+            .SelectMany(g => g)
+            .Where(m => m.Bubble == bubble)
+            .Sum(m => m.Box.W * (double)m.Box.H);
+
+        return textArea > 0 && rect.W * (double)rect.H <= textArea * 2.2;
     }
 
     private static (int X, int Y, int W, int H) AreaOf(

@@ -54,6 +54,14 @@ namespace Pixiv_Viewer_WinUI
         {
             // 开发自检：--manga-selftest <图片> <输出目录>，不打开窗口，跑完写日志退出
             var commandLine = System.Environment.GetCommandLineArgs();
+
+            var fetchIndex = System.Array.IndexOf(commandLine, "--manga-fetch");
+            if (fetchIndex >= 0 && commandLine.Length > fetchIndex + 2)
+            {
+                _ = RunMangaFetchAsync(commandLine[fetchIndex + 1], commandLine[fetchIndex + 2]);
+                return;
+            }
+
             var downloadIndex = System.Array.IndexOf(commandLine, "--manga-download-test");
             if (downloadIndex >= 0 && commandLine.Length > downloadIndex + 1)
             {
@@ -83,6 +91,44 @@ namespace Pixiv_Viewer_WinUI
             _ = CheckUpdatesAsync();
         }
 
+
+        /// <summary>开发自检：把指定作品的每页原图抓到本地，用于离线复现。</summary>
+        private static async System.Threading.Tasks.Task RunMangaFetchAsync(string illustId, string outputDirectory)
+        {
+            var notes = new System.Text.StringBuilder();
+            void Log(string message)
+            {
+                lock (notes)
+                {
+                    notes.AppendLine($"[{System.DateTime.Now:HH:mm:ss}] {message}");
+                    try
+                    {
+                        System.IO.File.AppendAllText(
+                            System.IO.Path.Combine(outputDirectory, "fetch.log"),
+                            message + System.Environment.NewLine);
+                    }
+                    catch (System.Exception)
+                    {
+                        // 忽略
+                    }
+                }
+            }
+
+            try
+            {
+                System.IO.Directory.CreateDirectory(outputDirectory);
+                var summary = await Services.Manga.MangaFetcher.FetchAsync(illustId, outputDirectory, Log);
+                Log("result: " + summary);
+            }
+            catch (System.Exception ex)
+            {
+                Log("FAILED: " + ex);
+            }
+            finally
+            {
+                System.Environment.Exit(0);
+            }
+        }
 
         /// <summary>开发自检：只跑模型下载（验证续传与进度回调），日志写到指定目录。</summary>
         private static async System.Threading.Tasks.Task RunMangaDownloadTestAsync(string outputDirectory, bool lamaOnly = false)
